@@ -8,6 +8,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: delivery
+          POSTGRES_USER: usuario
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U usuario -d delivery"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: delivery
+      DB_USER: usuario
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
     permissions:
       contents: write
       pull-requests: write
