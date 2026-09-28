@@ -1,0 +1,38 @@
+package br.insper.delivery.loja.controller;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.validation.Valid;
+
+import br.insper.delivery.loja.dto.LojaRequest;
+import br.insper.delivery.loja.dto.LojaResponse;
+import br.insper.delivery.loja.service.LojaService;
+
+@RestController
+@RequestMapping("/lojas")
+public class LojaController {
+
+	private final LojaService lojaService;
+
+	public LojaController(LojaService lojaService) {
+		this.lojaService = lojaService;
+	}
+
+	@PostMapping
+	public ResponseEntity<LojaResponse> criar(@Valid @RequestBody LojaRequest request) {
+		LojaResponse response = LojaResponse.from(lojaService.criar(request));
+		return ResponseEntity.status(HttpStatus.CREATED).body(response);
+	}
+
+	@GetMapping("/{id}")
+	public ResponseEntity<LojaResponse> buscarPorId(@PathVariable Long id) {
+		return ResponseEntity.ok(LojaResponse.from(lojaService.buscarPorId(id)));
+	}
+}
