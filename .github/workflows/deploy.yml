@@ -64,7 +64,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: brttemily/delivery:${{ github.sha }}
+          tags: emilybrtt/delivery:${{ github.sha }}
 
       - name: Deploy na EC2
         uses: appleboy/ssh-action@master
@@ -88,4 +88,4 @@ jobs:
               -e DB_NAME=delivery \
               -e DB_USER=usuario \
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-              brttemily/delivery:${{ github.sha }}
+              emilybrtt/delivery:${{ github.sha }}
