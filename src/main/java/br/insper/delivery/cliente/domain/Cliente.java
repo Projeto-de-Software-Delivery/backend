@@ -5,6 +5,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
+/**
+ * Entidade que representa um cliente.
+ */
 @Entity
 public class Cliente {
 
@@ -21,6 +24,13 @@ public class Cliente {
 	protected Cliente() {
 	}
 
+	/**
+	 * Construtor da entidade Cliente.
+	 *
+	 * @param nome     Nome do cliente.
+	 * @param email    Email do cliente.
+	 * @param telefone Telefone do cliente.
+	 */
 	public Cliente(String nome, String email, String telefone) {
 		this.nome = nome;
 		this.email = email;

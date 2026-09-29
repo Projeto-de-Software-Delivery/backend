@@ -5,6 +5,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
+/**
+ * Entidade que representa uma loja.
+ */
 @Entity
 public class Loja {
 
@@ -21,6 +24,13 @@ public class Loja {
 	protected Loja() {
 	}
 
+	/**
+	 * Construtor da classe Loja.
+	 *
+	 * @param nome     Nome da loja.
+	 * @param cnpj     CNPJ da loja.
+	 * @param endereco Endereço da loja.
+	 */
 	public Loja(String nome, String cnpj, String endereco) {
 		this.nome = nome;
 		this.cnpj = cnpj;

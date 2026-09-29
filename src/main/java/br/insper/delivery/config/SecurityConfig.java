@@ -8,7 +8,13 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
-	// ponytail: libera tudo até a task KAN-17 (OAuth2 + JWT) ser implementada
+	/**
+	 * Configura o chain de filtros de segurança.
+	 *
+	 * @param http Objeto HttpSecurity para configurar.
+	 * @return O chain de filtros de segurança configurado.
+	 * @throws Exception Se ocorrer um erro durante a configuração.
+	 */
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		return http
