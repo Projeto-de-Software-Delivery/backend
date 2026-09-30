@@ -312,4 +312,59 @@ class PedidoControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.estoque").value(100));
 	}
+
+	private String envelope(String eventType, String data) {
+		return "{\"eventId\":\"" + eventType + "-1\",\"eventType\":\"" + eventType + "\",\"version\":1,"
+				+ "\"occurredAt\":\"2026-09-30T14:00:00Z\",\"data\":" + data + "}";
+	}
+
+	@Test
+	void fluxoCompletoDoPedidoPassaPelosCincoEstadosAteEntregue() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		Long produtoId = criarProduto(lojaId);
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
+
+		mockMvc.perform(get("/pedidos/" + pedidoId + "/status"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("AGUARDANDO_VALIDACAO"));
+
+		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/aceitar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(aceitarPedidoJson()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("VALIDADO"));
+
+		String entregaAceitaData = "{\"pedidoId\":\"" + pedidoId + "\",\"entregaId\":\"88\",\"entregadorId\":\"31\","
+				+ "\"nomeEntregador\":\"Joao\",\"veiculo\":\"moto\",\"etaRetiradaMin\":12}";
+		mockMvc.perform(post("/eventos/entrega-aceita")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(envelope("entrega.aceita", entregaAceitaData)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ENTREGA_ACEITA"));
+
+		String pedidoRetiradoData = "{\"pedidoId\":\"" + pedidoId + "\",\"entregaId\":\"88\",\"entregadorId\":\"31\","
+				+ "\"retiradoEm\":\"2026-09-30T14:25:00Z\",\"etaEntregaMin\":18}";
+		mockMvc.perform(post("/eventos/pedido-retirado")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(envelope("pedido.retirado", pedidoRetiradoData)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("EM_ENTREGA"));
+
+		String pedidoEntregueData = "{\"pedidoId\":\"" + pedidoId + "\",\"entregaId\":\"88\",\"entregadorId\":\"31\","
+				+ "\"entregueEm\":\"2026-09-30T14:45:00Z\",\"pinValidado\":true}";
+		mockMvc.perform(post("/eventos/pedido-entregue")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(envelope("pedido.entregue", pedidoEntregueData)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ENTREGUE"));
+
+		mockMvc.perform(get("/pedidos/" + pedidoId + "/status"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ENTREGUE"));
+
+		mockMvc.perform(get("/produtos/" + produtoId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estoque").value(98));
+	}
 }
