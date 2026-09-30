@@ -189,6 +189,20 @@ public class PedidoService {
 				.toList();
 	}
 
+	/**
+	 * Lista os pedidos de uma loja que ainda aguardam validação (painel da loja).
+	 *
+	 * @param lojaId ID da loja.
+	 * @return Lista de pedidos pendentes da loja.
+	 * @throws ResponseStatusException Se a loja não for encontrada.
+	 */
+	public List<PedidoResponse> listarPendentesPorLoja(Long lojaId) {
+		lojaService.buscarPorId(lojaId);
+		return pedidoRepository.findByLojaIdAndStatus(lojaId, PedidoStatus.AGUARDANDO_VALIDACAO).stream()
+				.map(pedido -> paraResponse(pedido, itemPedidoRepository.findByPedidoId(pedido.getId())))
+				.toList();
+	}
+
 	private Pedido buscarEntidade(Long id) {
 		return pedidoRepository.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido não encontrado"));

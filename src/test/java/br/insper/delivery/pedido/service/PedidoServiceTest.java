@@ -176,6 +176,27 @@ class PedidoServiceTest {
 	}
 
 	@Test
+	void listarPendentesPorLojaDeveRetornarApenasAguardandoValidacao() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findByLojaIdAndStatus(2L, PedidoStatus.AGUARDANDO_VALIDACAO)).thenReturn(List.of(pedido));
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+
+		List<PedidoResponse> resultado = pedidoService.listarPendentesPorLoja(2L);
+
+		assertThat(resultado).hasSize(1);
+	}
+
+	@Test
+	void listarPendentesPorLojaDeveLancarQuandoLojaNaoEncontrada() {
+		when(lojaService.buscarPorId(2L))
+				.thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Loja não encontrada"));
+
+		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
+				() -> pedidoService.listarPendentesPorLoja(2L));
+	}
+
+	@Test
 	void aplicarPedidoValidadoDeveTransicionarDeAguardandoValidacaoParaValidado() {
 		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
 		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));

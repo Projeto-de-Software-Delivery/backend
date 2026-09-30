@@ -190,4 +190,31 @@ class PedidoControllerTest {
 	void listarPedidosDeClienteInexistenteRetorna404() throws Exception {
 		mockMvc.perform(get("/clientes/999999/pedidos")).andExpect(status().isNotFound());
 	}
+
+	@Test
+	void listarPendentesDeLojaRetornaApenasAguardandoValidacao() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		Long produtoId = criarProduto();
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 1);
+		Long pedidoValidadoId = criarPedido(clienteId, lojaId, produtoId, 2);
+		mockMvc.perform(post("/eventos/pedido-validado")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"eventId\":\"e1\",\"eventType\":\"pedido.validado\",\"version\":1,"
+						+ "\"occurredAt\":\"2026-09-30T14:00:00Z\",\"data\":{\"pedidoId\":\"" + pedidoValidadoId
+						+ "\",\"lojaId\":\"" + lojaId + "\",\"enderecoRetirada\":{\"rua\":\"Rua A\",\"lat\":-23.5,"
+						+ "\"lng\":-46.6},\"enderecoEntrega\":{\"rua\":\"Rua B\",\"lat\":-23.5,\"lng\":-46.6},"
+						+ "\"valorFrete\":8.0,\"tempoPreparoMin\":20}}"))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(get("/lojas/" + lojaId + "/pedidos/pendentes"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].id").value(pedidoId));
+	}
+
+	@Test
+	void listarPendentesDeLojaInexistenteRetorna404() throws Exception {
+		mockMvc.perform(get("/lojas/999999/pedidos/pendentes")).andExpect(status().isNotFound());
+	}
 }
