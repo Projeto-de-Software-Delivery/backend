@@ -98,4 +98,20 @@ public class Pedido {
 		return dataCriacao;
 	}
 
+	/**
+	 * Aplica uma transição de status, validando que o pedido está no status de origem esperado.
+	 *
+	 * @param statusEsperado Status em que o pedido deve estar para que a transição seja permitida.
+	 * @param novoStatus     Status para o qual o pedido deve transicionar.
+	 * @throws IllegalStateException Se o pedido não estiver no status esperado.
+	 */
+	public void transicionar(PedidoStatus statusEsperado, PedidoStatus novoStatus) {
+		if (this.status != statusEsperado) {
+			throw new IllegalStateException(
+					"Pedido está em " + this.status + ", esperado " + statusEsperado + " para transicionar para "
+							+ novoStatus);
+		}
+		this.status = novoStatus;
+	}
+
 }

@@ -3,6 +3,8 @@ package br.insper.delivery.pedido.service;
 import java.math.BigDecimal;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,8 +17,12 @@ import br.insper.delivery.pedido.domain.Pedido;
 import br.insper.delivery.pedido.domain.PedidoStatus;
 import br.insper.delivery.pedido.dto.CriarPedidoRequest;
 import br.insper.delivery.pedido.dto.EnderecoEntregaResponse;
+import br.insper.delivery.pedido.dto.EntregaAceitaDados;
 import br.insper.delivery.pedido.dto.ItemPedidoResponse;
+import br.insper.delivery.pedido.dto.PedidoEntregueDados;
 import br.insper.delivery.pedido.dto.PedidoResponse;
+import br.insper.delivery.pedido.dto.PedidoRetiradoDados;
+import br.insper.delivery.pedido.dto.PedidoValidadoDados;
 import br.insper.delivery.pedido.event.PedidoCriadoEvent;
 import br.insper.delivery.pedido.event.PedidoCriadoEvento;
 import br.insper.delivery.pedido.repository.ItemPedidoRepository;
@@ -29,6 +35,8 @@ import br.insper.delivery.produto.service.ProdutoService;
  */
 @Service
 public class PedidoService {
+
+	private static final Logger log = LoggerFactory.getLogger(PedidoService.class);
 
 	private final PedidoRepository pedidoRepository;
 	private final ItemPedidoRepository itemPedidoRepository;
@@ -124,6 +132,50 @@ public class PedidoService {
 	}
 
 	/**
+	 * Consome o evento pedido.validado e aplica a transição AGUARDANDO_VALIDACAO -> VALIDADO.
+	 *
+	 * @param dados Payload do evento pedido.validado.
+	 * @return Pedido atualizado.
+	 * @throws ResponseStatusException Se o pedido não for encontrado ou não estiver no status esperado.
+	 */
+	public PedidoResponse aplicarPedidoValidado(PedidoValidadoDados dados) {
+		return aplicarTransicao(dados.pedidoId(), PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+	}
+
+	/**
+	 * Consome o evento entrega.aceita e aplica a transição VALIDADO -> ENTREGA_ACEITA.
+	 *
+	 * @param dados Payload do evento entrega.aceita.
+	 * @return Pedido atualizado.
+	 * @throws ResponseStatusException Se o pedido não for encontrado ou não estiver no status esperado.
+	 */
+	public PedidoResponse aplicarEntregaAceita(EntregaAceitaDados dados) {
+		return aplicarTransicao(dados.pedidoId(), PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+	}
+
+	/**
+	 * Consome o evento pedido.retirado e aplica a transição ENTREGA_ACEITA -> EM_ENTREGA.
+	 *
+	 * @param dados Payload do evento pedido.retirado.
+	 * @return Pedido atualizado.
+	 * @throws ResponseStatusException Se o pedido não for encontrado ou não estiver no status esperado.
+	 */
+	public PedidoResponse aplicarPedidoRetirado(PedidoRetiradoDados dados) {
+		return aplicarTransicao(dados.pedidoId(), PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
+	}
+
+	/**
+	 * Consome o evento pedido.entregue e aplica a transição EM_ENTREGA -> ENTREGUE.
+	 *
+	 * @param dados Payload do evento pedido.entregue.
+	 * @return Pedido atualizado.
+	 * @throws ResponseStatusException Se o pedido não for encontrado ou não estiver no status esperado.
+	 */
+	public PedidoResponse aplicarPedidoEntregue(PedidoEntregueDados dados) {
+		return aplicarTransicao(dados.pedidoId(), PedidoStatus.EM_ENTREGA, PedidoStatus.ENTREGUE);
+	}
+
+	/**
 	 * Lista todos os pedidos de um cliente.
 	 *
 	 * @param clienteId ID do cliente.
@@ -140,6 +192,27 @@ public class PedidoService {
 	private Pedido buscarEntidade(Long id) {
 		return pedidoRepository.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido não encontrado"));
+	}
+
+	private PedidoResponse aplicarTransicao(String pedidoIdTexto, PedidoStatus statusEsperado,
+			PedidoStatus novoStatus) {
+		Pedido pedido = buscarEntidade(parseId(pedidoIdTexto));
+		try {
+			pedido.transicionar(statusEsperado, novoStatus);
+		} catch (IllegalStateException e) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+		}
+		Pedido salvo = pedidoRepository.save(pedido);
+		log.info("Pedido {} transicionou de {} para {}", salvo.getId(), statusEsperado, novoStatus);
+		return paraResponse(salvo, itemPedidoRepository.findByPedidoId(salvo.getId()));
+	}
+
+	private Long parseId(String texto) {
+		try {
+			return Long.valueOf(texto);
+		} catch (NumberFormatException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pedidoId inválido: " + texto);
+		}
 	}
 
 	private PedidoResponse paraResponse(Pedido pedido, List<ItemPedido> itens) {
