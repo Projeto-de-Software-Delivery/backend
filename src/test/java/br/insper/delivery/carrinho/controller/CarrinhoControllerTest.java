@@ -42,11 +42,23 @@ class CarrinhoControllerTest {
 		return extrairId(result);
 	}
 
+	private Long criarLoja() throws Exception {
+		MvcResult result = mockMvc
+				.perform(post("/lojas")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"nome\":\"Padaria\",\"cnpj\":\"12345678000199\",\"endereco\":\"Rua A, 1\"}"))
+				.andExpect(status().isCreated())
+				.andReturn();
+		return extrairId(result);
+	}
+
 	private Long criarProduto(String preco) throws Exception {
+		Long lojaId = criarLoja();
 		MvcResult result = mockMvc
 				.perform(post("/produtos")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\",\"preco\":" + preco + ","
+						.content("{\"lojaId\":" + lojaId + ",\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\","
+								+ "\"preco\":" + preco + ",\"estoque\":100,"
 								+ "\"foto\":\"http://exemplo.com/foto.png\"}"))
 				.andExpect(status().isCreated())
 				.andReturn();

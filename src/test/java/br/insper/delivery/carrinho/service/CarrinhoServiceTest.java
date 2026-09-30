@@ -52,7 +52,7 @@ class CarrinhoServiceTest {
 	@Test
 	void adicionarItemNovoDeveCriarItemEPublicarEvento() {
 		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
-		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("10.00"), "foto.png");
+		Produto produto = new Produto(7L, "Bolo", "Sobremesas", new BigDecimal("10.00"), 10, "foto.png");
 		when(produtoService.buscarPorId(2L)).thenReturn(produto);
 		when(itemCarrinhoRepository.findByClienteIdAndProdutoId(1L, 2L)).thenReturn(Optional.empty());
 		ItemCarrinho salvo = new ItemCarrinho(1L, 2L, 3, new BigDecimal("10.00"));
@@ -69,7 +69,7 @@ class CarrinhoServiceTest {
 	@Test
 	void adicionarItemExistenteDeveSomarQuantidade() {
 		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
-		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("10.00"), "foto.png");
+		Produto produto = new Produto(7L, "Bolo", "Sobremesas", new BigDecimal("10.00"), 10, "foto.png");
 		when(produtoService.buscarPorId(2L)).thenReturn(produto);
 		ItemCarrinho existente = new ItemCarrinho(1L, 2L, 2, new BigDecimal("10.00"));
 		when(itemCarrinhoRepository.findByClienteIdAndProdutoId(1L, 2L)).thenReturn(Optional.of(existente));

@@ -51,12 +51,12 @@ class PedidoControllerTest {
 		return extrairId(result);
 	}
 
-	private Long criarProduto() throws Exception {
+	private Long criarProduto(Long lojaId) throws Exception {
 		MvcResult result = mockMvc
 				.perform(post("/produtos")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\",\"preco\":15.90,"
-								+ "\"foto\":\"http://exemplo.com/foto.png\"}"))
+						.content("{\"lojaId\":" + lojaId + ",\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\","
+								+ "\"preco\":15.90,\"estoque\":100,\"foto\":\"http://exemplo.com/foto.png\"}"))
 				.andExpect(status().isCreated())
 				.andReturn();
 		return extrairId(result);
@@ -81,7 +81,7 @@ class PedidoControllerTest {
 	void criarPedidoComDadosValidosRetorna201ComStatusAguardandoValidacao() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
+		Long produtoId = criarProduto(lojaId);
 
 		mockMvc.perform(post("/clientes/" + clienteId + "/pedidos")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -96,7 +96,7 @@ class PedidoControllerTest {
 	@Test
 	void criarPedidoParaClienteInexistenteRetorna404() throws Exception {
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
+		Long produtoId = criarProduto(lojaId);
 
 		mockMvc.perform(post("/clientes/999999/pedidos")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -107,7 +107,8 @@ class PedidoControllerTest {
 	@Test
 	void criarPedidoComLojaInexistenteRetorna404() throws Exception {
 		Long clienteId = criarCliente();
-		Long produtoId = criarProduto();
+		Long lojaId = criarLoja();
+		Long produtoId = criarProduto(lojaId);
 
 		mockMvc.perform(post("/clientes/" + clienteId + "/pedidos")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -142,7 +143,7 @@ class PedidoControllerTest {
 	void buscarPedidoExistenteRetorna200() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
+		Long produtoId = criarProduto(lojaId);
 		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
 
 		mockMvc.perform(get("/pedidos/" + pedidoId))
@@ -160,7 +161,7 @@ class PedidoControllerTest {
 	void buscarStatusDePedidoExistenteRetorna200() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
+		Long produtoId = criarProduto(lojaId);
 		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
 
 		mockMvc.perform(get("/pedidos/" + pedidoId + "/status"))
@@ -177,7 +178,7 @@ class PedidoControllerTest {
 	void listarPedidosDeClienteRetorna200() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
+		Long produtoId = criarProduto(lojaId);
 		criarPedido(clienteId, lojaId, produtoId, 1);
 		criarPedido(clienteId, lojaId, produtoId, 3);
 
@@ -195,7 +196,7 @@ class PedidoControllerTest {
 	void listarPendentesDeLojaRetornaApenasAguardandoValidacao() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
+		Long produtoId = criarProduto(lojaId);
 		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 1);
 		Long pedidoValidadoId = criarPedido(clienteId, lojaId, produtoId, 2);
 		mockMvc.perform(post("/eventos/pedido-validado")
@@ -216,5 +217,154 @@ class PedidoControllerTest {
 	@Test
 	void listarPendentesDeLojaInexistenteRetorna404() throws Exception {
 		mockMvc.perform(get("/lojas/999999/pedidos/pendentes")).andExpect(status().isNotFound());
+	}
+
+	private String aceitarPedidoJson() {
+		return "{\"enderecoRetirada\":{\"rua\":\"Rua A, 1\",\"lat\":-23.56,\"lng\":-46.65},"
+				+ "\"valorFrete\":8.00,\"tempoPreparoMin\":20}";
+	}
+
+	@Test
+	void aceitarPedidoBaixaEstoqueETransicionaParaValidado() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		Long produtoId = criarProduto(lojaId);
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
+
+		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/aceitar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(aceitarPedidoJson()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("VALIDADO"));
+
+		mockMvc.perform(get("/produtos/" + produtoId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estoque").value(98));
+	}
+
+	@Test
+	void aceitarPedidoComEstoqueInsuficienteRetorna409ENaoAlteraStatus() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		MvcResult produtoResult = mockMvc
+				.perform(post("/produtos")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"lojaId\":" + lojaId + ",\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\","
+								+ "\"preco\":15.90,\"estoque\":1,\"foto\":\"http://exemplo.com/foto.png\"}"))
+				.andExpect(status().isCreated())
+				.andReturn();
+		Long produtoId = extrairId(produtoResult);
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
+
+		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/aceitar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(aceitarPedidoJson()))
+				.andExpect(status().isConflict());
+
+		mockMvc.perform(get("/pedidos/" + pedidoId + "/status"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("AGUARDANDO_VALIDACAO"));
+	}
+
+	@Test
+	void aceitarPedidoDeOutraLojaRetorna404() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		Long outraLojaId = criarLoja();
+		Long produtoId = criarProduto(lojaId);
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 1);
+
+		mockMvc.perform(post("/lojas/" + outraLojaId + "/pedidos/" + pedidoId + "/aceitar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(aceitarPedidoJson()))
+				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void aceitarPedidoJaValidadoRetorna409() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		Long produtoId = criarProduto(lojaId);
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 1);
+		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/aceitar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(aceitarPedidoJson()))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/aceitar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(aceitarPedidoJson()))
+				.andExpect(status().isConflict());
+	}
+
+	@Test
+	void recusarPedidoCancelaSemAlterarEstoque() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		Long produtoId = criarProduto(lojaId);
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
+
+		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/recusar"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("CANCELADO"));
+
+		mockMvc.perform(get("/produtos/" + produtoId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estoque").value(100));
+	}
+
+	private String envelope(String eventType, String data) {
+		return "{\"eventId\":\"" + eventType + "-1\",\"eventType\":\"" + eventType + "\",\"version\":1,"
+				+ "\"occurredAt\":\"2026-09-30T14:00:00Z\",\"data\":" + data + "}";
+	}
+
+	@Test
+	void fluxoCompletoDoPedidoPassaPelosCincoEstadosAteEntregue() throws Exception {
+		Long clienteId = criarCliente();
+		Long lojaId = criarLoja();
+		Long produtoId = criarProduto(lojaId);
+		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
+
+		mockMvc.perform(get("/pedidos/" + pedidoId + "/status"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("AGUARDANDO_VALIDACAO"));
+
+		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/aceitar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(aceitarPedidoJson()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("VALIDADO"));
+
+		String entregaAceitaData = "{\"pedidoId\":\"" + pedidoId + "\",\"entregaId\":\"88\",\"entregadorId\":\"31\","
+				+ "\"nomeEntregador\":\"Joao\",\"veiculo\":\"moto\",\"etaRetiradaMin\":12}";
+		mockMvc.perform(post("/eventos/entrega-aceita")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(envelope("entrega.aceita", entregaAceitaData)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ENTREGA_ACEITA"));
+
+		String pedidoRetiradoData = "{\"pedidoId\":\"" + pedidoId + "\",\"entregaId\":\"88\",\"entregadorId\":\"31\","
+				+ "\"retiradoEm\":\"2026-09-30T14:25:00Z\",\"etaEntregaMin\":18}";
+		mockMvc.perform(post("/eventos/pedido-retirado")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(envelope("pedido.retirado", pedidoRetiradoData)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("EM_ENTREGA"));
+
+		String pedidoEntregueData = "{\"pedidoId\":\"" + pedidoId + "\",\"entregaId\":\"88\",\"entregadorId\":\"31\","
+				+ "\"entregueEm\":\"2026-09-30T14:45:00Z\",\"pinValidado\":true}";
+		mockMvc.perform(post("/eventos/pedido-entregue")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(envelope("pedido.entregue", pedidoEntregueData)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ENTREGUE"));
+
+		mockMvc.perform(get("/pedidos/" + pedidoId + "/status"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ENTREGUE"));
+
+		mockMvc.perform(get("/produtos/" + produtoId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estoque").value(98));
 	}
 }
