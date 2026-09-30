@@ -315,6 +315,6 @@ public class PedidoService {
 		EnderecoEntregaResponse enderecoEntrega = new EnderecoEntregaResponse(pedido.getEnderecoRua(),
 				pedido.getEnderecoLat(), pedido.getEnderecoLng());
 		return new PedidoResponse(pedido.getId(), pedido.getClienteId(), pedido.getLojaId(), itensResponse,
-				pedido.getTotal(), enderecoEntrega, pedido.getStatus(), pedido.getDataCriacao());
+				pedido.getTotal(), enderecoEntrega, pedido.getStatus(), pedido.getDataCriacao(), pedido.getPin());
 	}
 }
