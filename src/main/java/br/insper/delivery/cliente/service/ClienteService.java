@@ -1,5 +1,7 @@
 package br.insper.delivery.cliente.service;
 
+import java.util.List;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,15 @@ public class ClienteService {
 	}
 
 	/**
+	 * Lista todos os clientes.
+	 *
+	 * @return Lista de clientes.
+	 */
+	public List<Cliente> listarTodos() {
+		return clienteRepository.findAll();
+	}
+
+	/**
 	 * Busca um cliente pelo seu ID.
 	 *
 	 * @param id ID do cliente a ser buscado.
@@ -51,5 +62,30 @@ public class ClienteService {
 	public Cliente buscarPorId(Long id) {
 		return clienteRepository.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado"));
+	}
+
+	/**
+	 * Atualiza os dados de um cliente existente.
+	 *
+	 * @param id      ID do cliente a ser atualizado.
+	 * @param request Novos dados do cliente.
+	 * @return O cliente atualizado.
+	 * @throws ResponseStatusException Se o cliente não for encontrado.
+	 */
+	public Cliente atualizar(Long id, ClienteRequest request) {
+		Cliente cliente = buscarPorId(id);
+		cliente.atualizar(request.nome(), request.email(), request.telefone());
+		return clienteRepository.save(cliente);
+	}
+
+	/**
+	 * Remove um cliente.
+	 *
+	 * @param id ID do cliente a ser removido.
+	 * @throws ResponseStatusException Se o cliente não for encontrado.
+	 */
+	public void deletar(Long id) {
+		Cliente cliente = buscarPorId(id);
+		clienteRepository.delete(cliente);
 	}
 }
