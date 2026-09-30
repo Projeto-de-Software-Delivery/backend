@@ -2,18 +2,22 @@ package br.insper.delivery.pedido.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.insper.delivery.pedido.dto.CriarPedidoRequest;
 import br.insper.delivery.pedido.dto.PedidoResponse;
 import br.insper.delivery.pedido.dto.PedidoStatusResponse;
 import br.insper.delivery.pedido.service.PedidoService;
+import jakarta.validation.Valid;
 
 /**
- * Controlador de consulta de pedidos.
+ * Controlador de pedidos.
  */
 @RestController
 public class PedidoController {
@@ -25,6 +29,20 @@ public class PedidoController {
 	}
 
 	/**
+	 * Cria um novo pedido para um cliente, com status AGUARDANDO_VALIDACAO.
+	 *
+	 * @param clienteId ID do cliente que está fazendo o pedido.
+	 * @param request   Loja, itens e endereço de entrega do pedido.
+	 * @return ResponseEntity com o pedido criado.
+	 */
+	@PostMapping("/clientes/{clienteId}/pedidos")
+	public ResponseEntity<PedidoResponse> criar(@PathVariable Long clienteId,
+			@Valid @RequestBody CriarPedidoRequest request) {
+		PedidoResponse response = pedidoService.criar(clienteId, request);
+		return ResponseEntity.status(HttpStatus.CREATED).body(response);
+	}
+
+	/**
 	 * Busca um pedido pelo seu ID.
 	 *
 	 * @param id ID do pedido a ser buscado.
@@ -32,7 +50,7 @@ public class PedidoController {
 	 */
 	@GetMapping("/pedidos/{id}")
 	public ResponseEntity<PedidoResponse> buscarPorId(@PathVariable Long id) {
-		return ResponseEntity.ok(PedidoResponse.from(pedidoService.buscarPorId(id)));
+		return ResponseEntity.ok(pedidoService.buscarPorId(id));
 	}
 
 	/**
@@ -43,7 +61,7 @@ public class PedidoController {
 	 */
 	@GetMapping("/pedidos/{id}/status")
 	public ResponseEntity<PedidoStatusResponse> buscarStatus(@PathVariable Long id) {
-		return ResponseEntity.ok(PedidoStatusResponse.from(pedidoService.buscarPorId(id)));
+		return ResponseEntity.ok(new PedidoStatusResponse(id, pedidoService.buscarStatus(id)));
 	}
 
 	/**
@@ -54,8 +72,6 @@ public class PedidoController {
 	 */
 	@GetMapping("/clientes/{clienteId}/pedidos")
 	public ResponseEntity<List<PedidoResponse>> listarPorCliente(@PathVariable Long clienteId) {
-		List<PedidoResponse> response = pedidoService.listarPorCliente(clienteId).stream().map(PedidoResponse::from)
-				.toList();
-		return ResponseEntity.ok(response);
+		return ResponseEntity.ok(pedidoService.listarPorCliente(clienteId));
 	}
 }

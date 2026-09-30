@@ -24,10 +24,16 @@ public class Pedido {
 
 	private Long lojaId;
 
-	private BigDecimal valorTotal;
+	private BigDecimal total;
 
 	@Enumerated(EnumType.STRING)
 	private PedidoStatus status;
+
+	private String enderecoRua;
+
+	private Double enderecoLat;
+
+	private Double enderecoLng;
 
 	private Instant dataCriacao;
 
@@ -35,17 +41,24 @@ public class Pedido {
 	}
 
 	/**
-	 * Construtor da classe Pedido. O pedido é criado com status RECEBIDO.
+	 * Construtor da classe Pedido. O pedido é criado com status AGUARDANDO_VALIDACAO.
 	 *
-	 * @param clienteId  ID do cliente que fez o pedido.
-	 * @param lojaId     ID da loja do pedido.
-	 * @param valorTotal Valor total do pedido.
+	 * @param clienteId   ID do cliente que fez o pedido.
+	 * @param lojaId      ID da loja do pedido.
+	 * @param total       Valor total do pedido.
+	 * @param enderecoRua Logradouro do endereço de entrega.
+	 * @param enderecoLat Latitude do endereço de entrega.
+	 * @param enderecoLng Longitude do endereço de entrega.
 	 */
-	public Pedido(Long clienteId, Long lojaId, BigDecimal valorTotal) {
+	public Pedido(Long clienteId, Long lojaId, BigDecimal total, String enderecoRua, Double enderecoLat,
+			Double enderecoLng) {
 		this.clienteId = clienteId;
 		this.lojaId = lojaId;
-		this.valorTotal = valorTotal;
-		this.status = PedidoStatus.RECEBIDO;
+		this.total = total;
+		this.enderecoRua = enderecoRua;
+		this.enderecoLat = enderecoLat;
+		this.enderecoLng = enderecoLng;
+		this.status = PedidoStatus.AGUARDANDO_VALIDACAO;
 		this.dataCriacao = Instant.now();
 	}
 
@@ -61,12 +74,24 @@ public class Pedido {
 		return lojaId;
 	}
 
-	public BigDecimal getValorTotal() {
-		return valorTotal;
+	public BigDecimal getTotal() {
+		return total;
 	}
 
 	public PedidoStatus getStatus() {
 		return status;
+	}
+
+	public String getEnderecoRua() {
+		return enderecoRua;
+	}
+
+	public Double getEnderecoLat() {
+		return enderecoLat;
+	}
+
+	public Double getEnderecoLng() {
+		return enderecoLng;
 	}
 
 	public Instant getDataCriacao() {

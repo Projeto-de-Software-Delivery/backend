@@ -4,8 +4,8 @@ package br.insper.delivery.pedido.domain;
  * Status do ciclo de vida de um pedido.
  */
 public enum PedidoStatus {
-	RECEBIDO,
-	EM_PREPARO,
+	AGUARDANDO_VALIDACAO,
+	VALIDADO,
 	EM_ENTREGA,
 	ENTREGUE,
 	CANCELADO
