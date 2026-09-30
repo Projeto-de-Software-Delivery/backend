@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,9 +27,14 @@ import br.insper.delivery.pedido.domain.ItemPedido;
 import br.insper.delivery.pedido.domain.Pedido;
 import br.insper.delivery.pedido.domain.PedidoStatus;
 import br.insper.delivery.pedido.dto.CriarPedidoRequest;
+import br.insper.delivery.pedido.dto.EnderecoDados;
 import br.insper.delivery.pedido.dto.EnderecoEntregaRequest;
+import br.insper.delivery.pedido.dto.EntregaAceitaDados;
 import br.insper.delivery.pedido.dto.ItemPedidoRequest;
+import br.insper.delivery.pedido.dto.PedidoEntregueDados;
 import br.insper.delivery.pedido.dto.PedidoResponse;
+import br.insper.delivery.pedido.dto.PedidoRetiradoDados;
+import br.insper.delivery.pedido.dto.PedidoValidadoDados;
 import br.insper.delivery.pedido.event.PedidoCriadoEvent;
 import br.insper.delivery.pedido.repository.ItemPedidoRepository;
 import br.insper.delivery.pedido.repository.PedidoRepository;
@@ -167,5 +173,135 @@ class PedidoServiceTest {
 
 		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
 				() -> pedidoService.listarPorCliente(1L));
+	}
+
+	@Test
+	void aplicarPedidoValidadoDeveTransicionarDeAguardandoValidacaoParaValidado() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
+				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+
+		PedidoResponse response = pedidoService.aplicarPedidoValidado(dados);
+
+		assertThat(response.status()).isEqualTo(PedidoStatus.VALIDADO);
+	}
+
+	@Test
+	void aplicarPedidoValidadoDeveLancarConflitoQuandoPedidoNaoEstaAguardandoValidacao() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
+				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aplicarPedidoValidado(dados));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void aplicarPedidoValidadoDeveLancarQuandoPedidoNaoEncontrado() {
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.empty());
+		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
+				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+
+		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
+				() -> pedidoService.aplicarPedidoValidado(dados));
+	}
+
+	@Test
+	void aplicarEntregaAceitaDeveTransicionarDeValidadoParaEntregaAceita() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+		EntregaAceitaDados dados = new EntregaAceitaDados("1", "88", "31", "Joao", "moto", 12);
+
+		PedidoResponse response = pedidoService.aplicarEntregaAceita(dados);
+
+		assertThat(response.status()).isEqualTo(PedidoStatus.ENTREGA_ACEITA);
+	}
+
+	@Test
+	void aplicarEntregaAceitaDeveLancarConflitoQuandoPedidoNaoEstaValidado() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		EntregaAceitaDados dados = new EntregaAceitaDados("1", "88", "31", "Joao", "moto", 12);
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aplicarEntregaAceita(dados));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void aplicarPedidoRetiradoDeveTransicionarDeEntregaAceitaParaEmEntrega() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+		PedidoRetiradoDados dados = new PedidoRetiradoDados("1", "88", "31", Instant.now(), 18);
+
+		PedidoResponse response = pedidoService.aplicarPedidoRetirado(dados);
+
+		assertThat(response.status()).isEqualTo(PedidoStatus.EM_ENTREGA);
+	}
+
+	@Test
+	void aplicarPedidoRetiradoDeveLancarConflitoQuandoPedidoNaoEstaEntregaAceita() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		PedidoRetiradoDados dados = new PedidoRetiradoDados("1", "88", "31", Instant.now(), 18);
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aplicarPedidoRetirado(dados));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void aplicarPedidoEntregueDeveTransicionarDeEmEntregaParaEntregue() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		pedido.transicionar(PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+		PedidoEntregueDados dados = new PedidoEntregueDados("1", "88", "31", Instant.now(), true);
+
+		PedidoResponse response = pedidoService.aplicarPedidoEntregue(dados);
+
+		assertThat(response.status()).isEqualTo(PedidoStatus.ENTREGUE);
+	}
+
+	@Test
+	void aplicarPedidoEntregueDeveLancarConflitoQuandoPedidoNaoEstaEmEntrega() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		PedidoEntregueDados dados = new PedidoEntregueDados("1", "88", "31", Instant.now(), true);
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aplicarPedidoEntregue(dados));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void aplicarTransicaoDeveLancarBadRequestQuandoPedidoIdInvalido() {
+		PedidoValidadoDados dados = new PedidoValidadoDados("abc", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
+				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aplicarPedidoValidado(dados));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 	}
 }
