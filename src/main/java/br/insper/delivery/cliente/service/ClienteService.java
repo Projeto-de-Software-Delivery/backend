@@ -12,6 +12,9 @@ import br.insper.delivery.cliente.dto.ClienteRequest;
 import br.insper.delivery.cliente.event.ClienteCriadoEvent;
 import br.insper.delivery.cliente.repository.ClienteRepository;
 
+/**
+ * Serviço para gerenciar clientes.
+ */
 @Service
 public class ClienteService {
 
@@ -22,7 +25,6 @@ public class ClienteService {
 	 * Construtor da classe ClienteService.
 	 *
 	 * @param clienteRepository Repositório de clientes.
-	 *
 	 * @param eventPublisher    Publicador de eventos.
 	 */
 	public ClienteService(ClienteRepository clienteRepository, ApplicationEventPublisher eventPublisher) {
