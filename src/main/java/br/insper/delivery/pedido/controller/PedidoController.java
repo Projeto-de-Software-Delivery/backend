@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.insper.delivery.pedido.dto.AceitarPedidoRequest;
 import br.insper.delivery.pedido.dto.CriarPedidoRequest;
 import br.insper.delivery.pedido.dto.PedidoResponse;
 import br.insper.delivery.pedido.dto.PedidoStatusResponse;
@@ -84,5 +85,32 @@ public class PedidoController {
 	@GetMapping("/lojas/{lojaId}/pedidos/pendentes")
 	public ResponseEntity<List<PedidoResponse>> listarPendentesPorLoja(@PathVariable Long lojaId) {
 		return ResponseEntity.ok(pedidoService.listarPendentesPorLoja(lojaId));
+	}
+
+	/**
+	 * A loja aceita um pedido pendente: baixa o estoque dos itens, transiciona o pedido para
+	 * VALIDADO e publica o evento pedido.validado.
+	 *
+	 * @param lojaId   ID da loja.
+	 * @param pedidoId ID do pedido a ser aceito.
+	 * @param request  Endereço de retirada, valor do frete e tempo de preparo informados pela loja.
+	 * @return ResponseEntity com o pedido atualizado.
+	 */
+	@PostMapping("/lojas/{lojaId}/pedidos/{pedidoId}/aceitar")
+	public ResponseEntity<PedidoResponse> aceitar(@PathVariable Long lojaId, @PathVariable Long pedidoId,
+			@Valid @RequestBody AceitarPedidoRequest request) {
+		return ResponseEntity.ok(pedidoService.aceitar(lojaId, pedidoId, request));
+	}
+
+	/**
+	 * A loja recusa um pedido pendente, cancelando-o.
+	 *
+	 * @param lojaId   ID da loja.
+	 * @param pedidoId ID do pedido a ser recusado.
+	 * @return ResponseEntity com o pedido atualizado.
+	 */
+	@PostMapping("/lojas/{lojaId}/pedidos/{pedidoId}/recusar")
+	public ResponseEntity<PedidoResponse> recusar(@PathVariable Long lojaId, @PathVariable Long pedidoId) {
+		return ResponseEntity.ok(pedidoService.recusar(lojaId, pedidoId));
 	}
 }

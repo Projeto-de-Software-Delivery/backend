@@ -51,12 +51,12 @@ class EventoConsumidorControllerTest {
 		return extrairId(result);
 	}
 
-	private Long criarProduto() throws Exception {
+	private Long criarProduto(Long lojaId) throws Exception {
 		MvcResult result = mockMvc
 				.perform(post("/produtos")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\",\"preco\":15.90,"
-								+ "\"foto\":\"http://exemplo.com/foto.png\"}"))
+						.content("{\"lojaId\":" + lojaId + ",\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\","
+								+ "\"preco\":15.90,\"estoque\":100,\"foto\":\"http://exemplo.com/foto.png\"}"))
 				.andExpect(status().isCreated())
 				.andReturn();
 		return extrairId(result);
@@ -65,7 +65,7 @@ class EventoConsumidorControllerTest {
 	private Long criarPedido() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
+		Long produtoId = criarProduto(lojaId);
 		MvcResult result = mockMvc
 				.perform(post("/clientes/" + clienteId + "/pedidos")
 						.contentType(MediaType.APPLICATION_JSON)
