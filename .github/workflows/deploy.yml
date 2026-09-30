@@ -88,4 +88,8 @@ jobs:
               -e DB_NAME=delivery \
               -e DB_USER=usuario \
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              -e RABBITMQ_HOST=rabbitmq \
+              -e RABBITMQ_PORT=5672 \
+              -e RABBITMQ_USER=guest \
+              -e RABBITMQ_PASSWORD=guest \
               emilybrtt/delivery:${{ github.sha }}
