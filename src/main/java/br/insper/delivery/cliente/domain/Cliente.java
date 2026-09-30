@@ -53,4 +53,17 @@ public class Cliente {
 		return telefone;
 	}
 
+	/**
+	 * Atualiza os dados do cliente.
+	 *
+	 * @param nome     Nome do cliente.
+	 * @param email    Email do cliente.
+	 * @param telefone Telefone do cliente.
+	 */
+	public void atualizar(String nome, String email, String telefone) {
+		this.nome = nome;
+		this.email = email;
+		this.telefone = telefone;
+	}
+
 }
