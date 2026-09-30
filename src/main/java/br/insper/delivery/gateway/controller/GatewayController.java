@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 
 import br.insper.delivery.gateway.config.RouteProperties;
 import br.insper.delivery.gateway.event.RequisicaoRoteadaEvent;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Controlador para gerenciar o roteamento de requisições.
@@ -42,7 +43,7 @@ public class GatewayController {
 	 * @return ResponseEntity com a resposta da requisição.
 	 */
 	@RequestMapping("/clientes/**")
-	public ResponseEntity<String> rotearParaCliente(HttpMethod method, jakarta.servlet.http.HttpServletRequest request,
+	public ResponseEntity<String> rotearParaCliente(HttpMethod method, HttpServletRequest request,
 			@RequestBody(required = false) String body) {
 		return rotear(routeProperties.clienteServiceUrl(), "cliente-service", method, request, body);
 	}
@@ -56,21 +57,23 @@ public class GatewayController {
 	 * @return ResponseEntity com a resposta da requisição.
 	 */
 	@RequestMapping("/lojas/**")
-	public ResponseEntity<String> rotearParaLoja(HttpMethod method, jakarta.servlet.http.HttpServletRequest request,
+	public ResponseEntity<String> rotearParaLoja(HttpMethod method, HttpServletRequest request,
 			@RequestBody(required = false) String body) {
 		return rotear(routeProperties.lojaServiceUrl(), "loja-service", method, request, body);
 	}
 
 	/**
-	 * Roteia uma requisição para o serviço de pedidos.
+	 * Encaminha a requisição para o serviço de destino e publica o evento de roteamento.
 	 *
-	 * @param method  Método HTTP da requisição.
-	 * @param request Requisição HTTP.
-	 * @param body    Corpo da requisição.
+	 * @param baseUrl        URL base do serviço de destino.
+	 * @param servicoDestino Nome do serviço de destino, usado no evento de roteamento.
+	 * @param method         Método HTTP da requisição.
+	 * @param request        Requisição HTTP.
+	 * @param body           Corpo da requisição.
 	 * @return ResponseEntity com a resposta da requisição.
 	 */
 	private ResponseEntity<String> rotear(String baseUrl, String servicoDestino, HttpMethod method,
-			jakarta.servlet.http.HttpServletRequest request, String body) {
+			HttpServletRequest request, String body) {
 		String path = request.getRequestURI();
 		eventPublisher.publishEvent(new RequisicaoRoteadaEvent(this, servicoDestino, path));
 
