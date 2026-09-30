@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -50,5 +51,55 @@ class LojaServiceTest {
 
 		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
 				() -> lojaService.buscarPorId(1L));
+	}
+
+	@Test
+	void listarTodasDeveRetornarLojasDoRepositorio() {
+		Loja loja = new Loja("Padaria", "12345678000199", "Rua A, 1");
+		when(lojaRepository.findAll()).thenReturn(List.of(loja));
+
+		List<Loja> resultado = lojaService.listarTodas();
+
+		assertThat(resultado).hasSize(1);
+	}
+
+	@Test
+	void atualizarDeveAlterarDadosDaLojaExistente() {
+		Loja loja = new Loja("Padaria", "12345678000199", "Rua A, 1");
+		LojaRequest request = new LojaRequest("Padaria Nova", "98765432000188", "Rua B, 2");
+		when(lojaRepository.findById(1L)).thenReturn(Optional.of(loja));
+		when(lojaRepository.save(any(Loja.class))).thenReturn(loja);
+
+		Loja resultado = lojaService.atualizar(1L, request);
+
+		assertThat(resultado.getNome()).isEqualTo("Padaria Nova");
+		assertThat(resultado.getCnpj()).isEqualTo("98765432000188");
+	}
+
+	@Test
+	void atualizarDeveLancarQuandoNaoEncontrado() {
+		LojaRequest request = new LojaRequest("Padaria Nova", "98765432000188", "Rua B, 2");
+		when(lojaRepository.findById(1L)).thenReturn(Optional.empty());
+
+		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
+				() -> lojaService.atualizar(1L, request));
+	}
+
+	@Test
+	void deletarDeveRemoverLojaExistente() {
+		Loja loja = new Loja("Padaria", "12345678000199", "Rua A, 1");
+		when(lojaRepository.findById(1L)).thenReturn(Optional.of(loja));
+
+		lojaService.deletar(1L);
+
+		verify(lojaRepository).delete(loja);
+	}
+
+	@Test
+	void deletarDeveLancarQuandoNaoEncontrado() {
+		when(lojaRepository.findById(1L)).thenReturn(Optional.empty());
+
+		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
+				() -> lojaService.deletar(1L));
 	}
 }

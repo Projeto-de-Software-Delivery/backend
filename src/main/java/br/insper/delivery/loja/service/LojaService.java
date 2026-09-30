@@ -1,5 +1,7 @@
 package br.insper.delivery.loja.service;
 
+import java.util.List;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,15 @@ public class LojaService {
 	}
 
 	/**
+	 * Lista todas as lojas.
+	 *
+	 * @return Lista de lojas.
+	 */
+	public List<Loja> listarTodas() {
+		return lojaRepository.findAll();
+	}
+
+	/**
 	 * Busca uma loja pelo seu ID.
 	 *
 	 * @param id ID da loja a ser buscada.
@@ -53,5 +64,30 @@ public class LojaService {
 	public Loja buscarPorId(Long id) {
 		return lojaRepository.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Loja não encontrada"));
+	}
+
+	/**
+	 * Atualiza os dados de uma loja existente.
+	 *
+	 * @param id      ID da loja a ser atualizada.
+	 * @param request Novos dados da loja.
+	 * @return Loja atualizada.
+	 * @throws ResponseStatusException Se a loja não for encontrada.
+	 */
+	public Loja atualizar(Long id, LojaRequest request) {
+		Loja loja = buscarPorId(id);
+		loja.atualizar(request.nome(), request.cnpj(), request.endereco());
+		return lojaRepository.save(loja);
+	}
+
+	/**
+	 * Remove uma loja.
+	 *
+	 * @param id ID da loja a ser removida.
+	 * @throws ResponseStatusException Se a loja não for encontrada.
+	 */
+	public void deletar(Long id) {
+		Loja loja = buscarPorId(id);
+		lojaRepository.delete(loja);
 	}
 }

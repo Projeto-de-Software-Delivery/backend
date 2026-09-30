@@ -53,4 +53,17 @@ public class Loja {
 		return endereco;
 	}
 
+	/**
+	 * Atualiza os dados da loja.
+	 *
+	 * @param nome     Nome da loja.
+	 * @param cnpj     CNPJ da loja.
+	 * @param endereco Endereço da loja.
+	 */
+	public void atualizar(String nome, String cnpj, String endereco) {
+		this.nome = nome;
+		this.cnpj = cnpj;
+		this.endereco = endereco;
+	}
+
 }
