@@ -74,4 +74,15 @@ public class PedidoController {
 	public ResponseEntity<List<PedidoResponse>> listarPorCliente(@PathVariable Long clienteId) {
 		return ResponseEntity.ok(pedidoService.listarPorCliente(clienteId));
 	}
+
+	/**
+	 * Lista os pedidos de uma loja que ainda aguardam validação (painel da loja).
+	 *
+	 * @param lojaId ID da loja.
+	 * @return ResponseEntity com a lista de pedidos pendentes da loja.
+	 */
+	@GetMapping("/lojas/{lojaId}/pedidos/pendentes")
+	public ResponseEntity<List<PedidoResponse>> listarPendentesPorLoja(@PathVariable Long lojaId) {
+		return ResponseEntity.ok(pedidoService.listarPendentesPorLoja(lojaId));
+	}
 }

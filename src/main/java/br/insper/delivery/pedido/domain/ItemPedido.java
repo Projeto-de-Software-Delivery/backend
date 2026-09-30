@@ -43,14 +43,6 @@ public class ItemPedido {
 		this.precoUnitario = precoUnitario;
 	}
 
-	public Long getId() {
-		return id;
-	}
-
-	public Long getPedidoId() {
-		return pedidoId;
-	}
-
 	public Long getProdutoId() {
 		return produtoId;
 	}
