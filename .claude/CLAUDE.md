@@ -1,9 +1,20 @@
 # Fluxo de trabalho com Jira
 
-- Cada commit deve corresponder a uma task do Jira (projeto KAN) e começar com
-  o prefixo `KAN-<numero>:` na mensagem.
-- Depois de commitar, dar `git push origin main` — o push é obrigatório,
-  não basta commitar localmente.
-- Depois do push, transicionar a issue correspondente no Jira para
-  "Concluído" (transition id 41, no projeto KAN) usando o MCP da Atlassian.
+O Jira já tem automação nativa (dev panel/GitHub integration) que transiciona
+a issue sozinha: criar a branch move para "Em andamento", abrir PR move para
+"Em análise", e o merge do PR move para "Concluído". Esse é o único mecanismo
+de transição — não fazer transição manual por MCP, exceto para corrigir um
+caso que a automação claramente não cobriu (ver último item).
+
+- Toda issue trabalhada precisa de uma branch **própria e dedicada**, nomeada
+  `KAN-<numero>-<slug>` (o slug sugerido pela própria issue no Jira).
+- Nunca commitar ou dar push direto em `main`. Todo trabalho vai por PR da
+  branch da issue, mergeado no GitHub.
+- Commits nessa branch começam com o prefixo `KAN-<numero>:` na mensagem.
+- **1 branch/PR = 1 issue.** Se uma mudança acabar cobrindo mais de uma issue
+  (ex.: um contrato definido "de brinde" ao implementar outra task), abrir
+  branch/PR separado para essa issue extra, ou pelo menos comentar e
+  transicionar essa issue manualmente depois do merge — nunca deixar uma
+  issue "carona" sem rastro algum. Uma issue que fica presa em "Tarefas
+  pendentes" mesmo com o trabalho pronto e mergeado é sinal desse problema.
 - Nunca adicionar `Co-Authored-By` nas mensagens de commit.
