@@ -34,34 +34,15 @@ O app é dividido em quatro serviços independentes, cada um em seu próprio
 repositório, que conversam por HTTP (requisições síncronas) e por RabbitMQ
 (eventos assíncronos de mudança de status do pedido):
 
-```
-                         ┌─────────────┐
-                         │   Gateway   │  roteamento + rate limit
-                         └──────┬──────┘
-                                │ HTTP
-                                ▼
-   ┌────────────────────────────────────────────────┐
-   │     delivery (este repo) — pedidos-lojas        │
-   │  cliente · loja · produto · carrinho · pedido   │
-   └───────────────┬───────────────────┬─────────────┘
-                    │ HTTP              │ publica eventos
-                    ▼                   ▼
-          ┌──────────────────┐   ┌─────────────┐
-          │  delivery-        │   │  RabbitMQ   │
-          │  entregador       │   │ (exchange   │
-          │  (FastAPI)        │   │  "pedidos") │
-          └──────────────────┘   └──────┬──────┘
-                                          │ consome
-                                          ▼
-                                 ┌──────────────────┐
-                                 │  servico-         │
-                                 │  notificacoes     │
-                                 │  (Node.js)        │
-                                 └──────────────────┘
-                                   │              │
-                                   ▼              ▼
-                              WebSocket        Push (FCM/APNs)
-                              (app aberto)     (app fechado)
+```mermaid
+flowchart TB
+    App[App do usuário] -->|HTTP| GW[Gateway\nroteamento + rate limit]
+    GW -->|HTTP| PL["pedidos-lojas (este repo)\ncliente · loja · produto · carrinho · pedido"]
+    PL -->|HTTP: busca/atribui entregador| ENT[delivery-entregador\nFastAPI]
+    PL -->|publica eventos| MQ[(RabbitMQ\nexchange pedidos)]
+    MQ -->|consome| NOT[servico-notificacoes\nNode.js]
+    NOT --> WS[WebSocket\napp aberto]
+    NOT --> PUSH[Push FCM / APNs\napp fechado]
 ```
 
 Fluxo de ponta a ponta de um pedido:
@@ -104,10 +85,16 @@ Lista completa de rotas e contratos: veja a [documentação OpenAPI](#documenta�
 
 ## Máquina de estados do pedido
 
-```
-AGUARDANDO_VALIDACAO ──► VALIDADO ──► ENTREGA_ACEITA ──► EM_ENTREGA ──► ENTREGUE
-        │
-        └──► CANCELADO   (loja recusa)
+```mermaid
+stateDiagram-v2
+    [*] --> AGUARDANDO_VALIDACAO
+    AGUARDANDO_VALIDACAO --> VALIDADO: loja aceita (baixa estoque)
+    AGUARDANDO_VALIDACAO --> CANCELADO: loja recusa
+    VALIDADO --> ENTREGA_ACEITA: entregador atribuído
+    ENTREGA_ACEITA --> EM_ENTREGA: retirada na loja
+    EM_ENTREGA --> ENTREGUE: PIN validado
+    CANCELADO --> [*]
+    ENTREGUE --> [*]
 ```
 
 - **AGUARDANDO_VALIDACAO**: pedido criado, estoque ainda não baixado.
