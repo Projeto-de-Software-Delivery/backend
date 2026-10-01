@@ -228,9 +228,10 @@ public class PedidoService {
 		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
 		log.info("Pedido {} atribuído ao entregador {}", pedido.getId(), escolhido.id());
 
+		// payloads.md exemplifica veiculo em minusculo; o servico de entregador usa maiusculo.
 		EntregaAceitaDados dados = new EntregaAceitaDados(String.valueOf(pedido.getId()),
-				UUID.randomUUID().toString(), escolhido.id(), escolhido.nome(), escolhido.veiculo(),
-				ETA_RETIRADA_PADRAO_MIN);
+				UUID.randomUUID().toString(), escolhido.id(), escolhido.nome(),
+				escolhido.veiculo().toLowerCase(), ETA_RETIRADA_PADRAO_MIN);
 		eventPublisher.publishEvent(new EntregaAceitaEvent(this, EntregaAceitaEvento.de(dados)));
 	}
 
