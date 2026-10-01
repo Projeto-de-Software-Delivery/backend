@@ -1,6 +1,7 @@
 package br.insper.delivery.pedido.domain;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.Instant;
 
 import jakarta.persistence.Entity;
@@ -15,6 +16,8 @@ import jakarta.persistence.Id;
  */
 @Entity
 public class Pedido {
+
+	private static final SecureRandom RANDOM = new SecureRandom();
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,11 +40,14 @@ public class Pedido {
 
 	private Instant dataCriacao;
 
+	private String pin;
+
 	protected Pedido() {
 	}
 
 	/**
-	 * Construtor da classe Pedido. O pedido é criado com status AGUARDANDO_VALIDACAO.
+	 * Construtor da classe Pedido. O pedido é criado com status AGUARDANDO_VALIDACAO e um PIN de
+	 * entrega de 4 dígitos, que o entregador deve validar com o cliente ao finalizar a corrida.
 	 *
 	 * @param clienteId   ID do cliente que fez o pedido.
 	 * @param lojaId      ID da loja do pedido.
@@ -60,6 +66,7 @@ public class Pedido {
 		this.enderecoLng = enderecoLng;
 		this.status = PedidoStatus.AGUARDANDO_VALIDACAO;
 		this.dataCriacao = Instant.now();
+		this.pin = "%04d".formatted(RANDOM.nextInt(10000));
 	}
 
 	public Long getId() {
@@ -96,6 +103,10 @@ public class Pedido {
 
 	public Instant getDataCriacao() {
 		return dataCriacao;
+	}
+
+	public String getPin() {
+		return pin;
 	}
 
 	/**
