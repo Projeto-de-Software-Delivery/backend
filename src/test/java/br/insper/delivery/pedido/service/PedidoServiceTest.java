@@ -93,7 +93,27 @@ class PedidoServiceTest {
 		assertThat(response.total()).isEqualByComparingTo("31.80");
 		assertThat(response.itens()).hasSize(1);
 		assertThat(response.enderecoEntrega().rua()).isEqualTo("Rua B, 2");
+		assertThat(response.pin()).matches("\\d{4}");
 		verify(eventPublisher).publishEvent(any(PedidoCriadoEvent.class));
+	}
+
+	@Test
+	void criarDeveGerarPinDiferenteACadaPedido() {
+		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Produto produto = new Produto(2L, "Bolo", "Sobremesas", new BigDecimal("15.90"), 10, "foto.png");
+		when(produtoService.buscarPorId(9L)).thenReturn(produto);
+		when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(itemPedidoRepository.save(any(ItemPedido.class)))
+				.thenReturn(new ItemPedido(null, 9L, 2, new BigDecimal("15.90")));
+
+		List<String> pins = java.util.stream.IntStream.range(0, 20)
+				.mapToObj(i -> pedidoService.criar(1L, requestPadrao()).pin())
+				.toList();
+
+		assertThat(pins).allMatch(pin -> pin.matches("\\d{4}"));
+		assertThat(pins.stream().distinct().count()).as("pelo menos algum pin diferente em 20 geracoes")
+				.isGreaterThan(1);
 	}
 
 	@Test
