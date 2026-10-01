@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.service.ClienteService;
+import br.insper.delivery.loja.domain.EstoqueLoja;
+import br.insper.delivery.loja.service.EstoqueLojaService;
 import br.insper.delivery.loja.service.LojaService;
 import br.insper.delivery.pedido.domain.ItemPedido;
 import br.insper.delivery.pedido.domain.Pedido;
@@ -43,6 +45,7 @@ public class PedidoService {
 	private final ClienteService clienteService;
 	private final LojaService lojaService;
 	private final ProdutoService produtoService;
+	private final EstoqueLojaService estoqueLojaService;
 	private final ApplicationEventPublisher eventPublisher;
 
 	/**
@@ -53,16 +56,18 @@ public class PedidoService {
 	 * @param clienteService       Serviço de clientes, usado para validar o dono do pedido.
 	 * @param lojaService          Serviço de lojas, usado para validar a loja do pedido.
 	 * @param produtoService       Serviço de produtos, usado para validar e precificar os itens.
+	 * @param estoqueLojaService   Serviço de estoque, usado para verificar disponibilidade dos itens.
 	 * @param eventPublisher       Publicador de eventos.
 	 */
 	public PedidoService(PedidoRepository pedidoRepository, ItemPedidoRepository itemPedidoRepository,
 			ClienteService clienteService, LojaService lojaService, ProdutoService produtoService,
-			ApplicationEventPublisher eventPublisher) {
+			EstoqueLojaService estoqueLojaService, ApplicationEventPublisher eventPublisher) {
 		this.pedidoRepository = pedidoRepository;
 		this.itemPedidoRepository = itemPedidoRepository;
 		this.clienteService = clienteService;
 		this.lojaService = lojaService;
 		this.produtoService = produtoService;
+		this.estoqueLojaService = estoqueLojaService;
 		this.eventPublisher = eventPublisher;
 	}
 
@@ -72,7 +77,8 @@ public class PedidoService {
 	 * @param clienteId ID do cliente que está fazendo o pedido.
 	 * @param request   Loja, itens e endereço de entrega do pedido.
 	 * @return Pedido criado.
-	 * @throws ResponseStatusException Se o cliente, a loja ou algum produto não forem encontrados.
+	 * @throws ResponseStatusException Se o cliente, a loja ou algum produto não forem encontrados,
+	 *                                 ou se algum produto não estiver disponível no estoque da loja.
 	 */
 	public PedidoResponse criar(Long clienteId, CriarPedidoRequest request) {
 		clienteService.buscarPorId(clienteId);
@@ -84,6 +90,14 @@ public class PedidoService {
 		List<ItemResolvido> resolvidos = request.itens().stream()
 				.map(itemRequest -> {
 					Produto produto = produtoService.buscarPorId(itemRequest.produtoId());
+					EstoqueLoja estoque = estoqueLojaService.buscarPorLojaEProduto(
+							request.lojaId(), itemRequest.produtoId());
+					if (!estoque.temEstoqueSuficiente(itemRequest.quantidade())) {
+						throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+								"Estoque insuficiente para o produto " + itemRequest.produtoId()
+										+ ": disponível=" + estoque.getQuantidade()
+										+ ", solicitado=" + itemRequest.quantidade());
+					}
 					return new ItemResolvido(itemRequest.produtoId(), itemRequest.quantidade(), produto.getPreco());
 				})
 				.toList();

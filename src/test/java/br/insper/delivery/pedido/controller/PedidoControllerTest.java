@@ -2,6 +2,7 @@ package br.insper.delivery.pedido.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -67,7 +68,15 @@ class PedidoControllerTest {
 				+ "}],\"enderecoEntrega\":{\"rua\":\"Rua B, 2\",\"lat\":-23.5,\"lng\":-46.6}}";
 	}
 
+	private void adicionarEstoque(Long lojaId, Long produtoId, int quantidade) throws Exception {
+		mockMvc.perform(put("/lojas/" + lojaId + "/estoque")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"produtoId\":" + produtoId + ",\"quantidade\":" + quantidade + "}"))
+				.andExpect(status().isOk());
+	}
+
 	private Long criarPedido(Long clienteId, Long lojaId, Long produtoId, int quantidade) throws Exception {
+		adicionarEstoque(lojaId, produtoId, quantidade + 10);
 		MvcResult result = mockMvc
 				.perform(post("/clientes/" + clienteId + "/pedidos")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -82,6 +91,7 @@ class PedidoControllerTest {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
 		Long produtoId = criarProduto();
+		adicionarEstoque(lojaId, produtoId, 10);
 
 		mockMvc.perform(post("/clientes/" + clienteId + "/pedidos")
 				.contentType(MediaType.APPLICATION_JSON)

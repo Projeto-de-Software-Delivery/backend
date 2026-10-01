@@ -21,7 +21,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.domain.Cliente;
 import br.insper.delivery.cliente.service.ClienteService;
+import br.insper.delivery.loja.domain.EstoqueLoja;
 import br.insper.delivery.loja.domain.Loja;
+import br.insper.delivery.loja.service.EstoqueLojaService;
 import br.insper.delivery.loja.service.LojaService;
 import br.insper.delivery.pedido.domain.ItemPedido;
 import br.insper.delivery.pedido.domain.Pedido;
@@ -60,6 +62,9 @@ class PedidoServiceTest {
 	private ProdutoService produtoService;
 
 	@Mock
+	private EstoqueLojaService estoqueLojaService;
+
+	@Mock
 	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
@@ -79,6 +84,8 @@ class PedidoServiceTest {
 		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
 		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("15.90"), "foto.png");
 		when(produtoService.buscarPorId(9L)).thenReturn(produto);
+		EstoqueLoja estoque = new EstoqueLoja(2L, 9L, 10);
+		when(estoqueLojaService.buscarPorLojaEProduto(2L, 9L)).thenReturn(estoque);
 		Pedido salvo = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
 		when(pedidoRepository.save(any(Pedido.class))).thenReturn(salvo);
 		ItemPedido itemSalvo = new ItemPedido(salvo.getId(), 9L, 2, new BigDecimal("15.90"));
@@ -121,6 +128,38 @@ class PedidoServiceTest {
 
 		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
 				() -> pedidoService.criar(1L, requestPadrao()));
+	}
+
+	@Test
+	void criarDeveLancarQuandoProdutoNaoDisponivelNaLoja() {
+		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("15.90"), "foto.png");
+		when(produtoService.buscarPorId(9L)).thenReturn(produto);
+		when(estoqueLojaService.buscarPorLojaEProduto(2L, 9L))
+				.thenThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+						"Produto 9 não disponível na loja 2"));
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.criar(1L, requestPadrao()));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+	}
+
+	@Test
+	void criarDeveLancarUnprocessableEntityQuandoEstoqueInsuficiente() {
+		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("15.90"), "foto.png");
+		when(produtoService.buscarPorId(9L)).thenReturn(produto);
+		// requestPadrao pede quantidade 2, mas estoque só tem 1
+		EstoqueLoja estoque = new EstoqueLoja(2L, 9L, 1);
+		when(estoqueLojaService.buscarPorLojaEProduto(2L, 9L)).thenReturn(estoque);
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.criar(1L, requestPadrao()));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 	}
 
 	@Test

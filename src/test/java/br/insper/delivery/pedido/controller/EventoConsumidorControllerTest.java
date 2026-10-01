@@ -1,6 +1,7 @@
 package br.insper.delivery.pedido.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,10 +63,18 @@ class EventoConsumidorControllerTest {
 		return extrairId(result);
 	}
 
+	private void adicionarEstoque(Long lojaId, Long produtoId, int quantidade) throws Exception {
+		mockMvc.perform(put("/lojas/" + lojaId + "/estoque")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"produtoId\":" + produtoId + ",\"quantidade\":" + quantidade + "}"))
+				.andExpect(status().isOk());
+	}
+
 	private Long criarPedido() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
 		Long produtoId = criarProduto();
+		adicionarEstoque(lojaId, produtoId, 10);
 		MvcResult result = mockMvc
 				.perform(post("/clientes/" + clienteId + "/pedidos")
 						.contentType(MediaType.APPLICATION_JSON)

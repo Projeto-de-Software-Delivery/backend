@@ -43,7 +43,7 @@ public class ProdutoController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 
-	/**
+	/**+
 	 * Lista todos os produtos do catálogo.
 	 *
 	 * @return ResponseEntity com a lista de produtos.
