@@ -14,15 +14,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.carrinho.domain.ItemCarrinho;
 import br.insper.delivery.carrinho.dto.CarrinhoResponse;
 import br.insper.delivery.carrinho.dto.ItemCarrinhoRequest;
-import br.insper.delivery.carrinho.event.ItemAdicionadoEvent;
-import br.insper.delivery.carrinho.event.ItemRemovidoEvent;
 import br.insper.delivery.carrinho.repository.ItemCarrinhoRepository;
 import br.insper.delivery.cliente.domain.Cliente;
 import br.insper.delivery.cliente.service.ClienteService;
@@ -41,16 +38,13 @@ class CarrinhoServiceTest {
 	@Mock
 	private ProdutoService produtoService;
 
-	@Mock
-	private ApplicationEventPublisher eventPublisher;
-
 	@InjectMocks
 	private CarrinhoService carrinhoService;
 
 	private static final Cliente CLIENTE = new Cliente("Ana", "ana@email.com", "11999999999");
 
 	@Test
-	void adicionarItemNovoDeveCriarItemEPublicarEvento() {
+	void adicionarItemNovoDeveCriarItem() {
 		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
 		Produto produto = new Produto(7L, "Bolo", "Sobremesas", new BigDecimal("10.00"), 10, "foto.png");
 		when(produtoService.buscarPorId(2L)).thenReturn(produto);
@@ -63,7 +57,6 @@ class CarrinhoServiceTest {
 
 		assertThat(response.itens()).hasSize(1);
 		assertThat(response.total()).isEqualByComparingTo("30.00");
-		verify(eventPublisher).publishEvent(any(ItemAdicionadoEvent.class));
 	}
 
 	@Test
@@ -113,7 +106,7 @@ class CarrinhoServiceTest {
 	}
 
 	@Test
-	void removerItemDeveExcluirEPublicarEvento() {
+	void removerItemDeveExcluirItem() {
 		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
 		ItemCarrinho item = new ItemCarrinho(1L, 2L, 3, new BigDecimal("10.00"));
 		when(itemCarrinhoRepository.findById(5L)).thenReturn(Optional.of(item));
@@ -122,7 +115,6 @@ class CarrinhoServiceTest {
 		CarrinhoResponse response = carrinhoService.removerItem(1L, 5L);
 
 		verify(itemCarrinhoRepository).delete(item);
-		verify(eventPublisher).publishEvent(any(ItemRemovidoEvent.class));
 		assertThat(response.itens()).isEmpty();
 	}
 

@@ -13,7 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.domain.Cliente;
@@ -21,7 +20,6 @@ import br.insper.delivery.cliente.repository.ClienteRepository;
 import br.insper.delivery.cliente.service.ClienteService;
 import br.insper.delivery.endereco.domain.Endereco;
 import br.insper.delivery.endereco.dto.EnderecoRequest;
-import br.insper.delivery.endereco.event.EnderecoCriadoEvent;
 import br.insper.delivery.endereco.repository.EnderecoRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,17 +31,14 @@ class EnderecoServiceTest {
 	@Mock
 	private ClienteRepository clienteRepository;
 
-	@Mock
-	private ApplicationEventPublisher eventPublisher;
-
 	private ClienteService clienteService;
 
 	private EnderecoService enderecoService;
 
 	@org.junit.jupiter.api.BeforeEach
 	void setUp() {
-		clienteService = new ClienteService(clienteRepository, eventPublisher);
-		enderecoService = new EnderecoService(enderecoRepository, clienteService, eventPublisher);
+		clienteService = new ClienteService(clienteRepository);
+		enderecoService = new EnderecoService(enderecoRepository, clienteService);
 	}
 
 	private static final Cliente CLIENTE = new Cliente("Ana", "ana@email.com", "11999999999");
@@ -53,7 +48,7 @@ class EnderecoServiceTest {
 	}
 
 	@Test
-	void criarDevePersistirEPublicarEventoQuandoClienteExiste() {
+	void criarDevePersistirEnderecoQuandoClienteExiste() {
 		when(clienteRepository.findById(1L)).thenReturn(Optional.of(CLIENTE));
 		Endereco salvo = new Endereco(1L, "01001000", "Praça da Sé", "1", "Lado ímpar", "Sé", "São Paulo", "SP");
 		when(enderecoRepository.save(any(Endereco.class))).thenReturn(salvo);
@@ -61,7 +56,6 @@ class EnderecoServiceTest {
 		Endereco resultado = enderecoService.criar(1L, requestPadrao());
 
 		assertThat(resultado.getCidade()).isEqualTo("São Paulo");
-		verify(eventPublisher).publishEvent(any(EnderecoCriadoEvent.class));
 	}
 
 	@Test

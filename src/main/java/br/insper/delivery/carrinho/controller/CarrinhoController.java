@@ -28,24 +28,11 @@ public class CarrinhoController {
 		this.carrinhoService = carrinhoService;
 	}
 
-	/**
-	 * Busca o carrinho do cliente, com os itens e o total calculado.
-	 *
-	 * @param clienteId ID do cliente dono do carrinho.
-	 * @return ResponseEntity com o carrinho do cliente.
-	 */
 	@GetMapping
 	public ResponseEntity<CarrinhoResponse> buscarCarrinho(@PathVariable Long clienteId) {
 		return ResponseEntity.ok(carrinhoService.buscarCarrinho(clienteId));
 	}
 
-	/**
-	 * Adiciona um item ao carrinho do cliente.
-	 *
-	 * @param clienteId ID do cliente dono do carrinho.
-	 * @param request   Produto e quantidade a serem adicionados.
-	 * @return ResponseEntity com o carrinho atualizado.
-	 */
 	@PostMapping("/itens")
 	public ResponseEntity<CarrinhoResponse> adicionarItem(@PathVariable Long clienteId,
 			@Valid @RequestBody ItemCarrinhoRequest request) {
@@ -53,13 +40,6 @@ public class CarrinhoController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 
-	/**
-	 * Remove um item do carrinho do cliente.
-	 *
-	 * @param clienteId ID do cliente dono do carrinho.
-	 * @param itemId    ID do item a ser removido.
-	 * @return ResponseEntity com o carrinho atualizado.
-	 */
 	@DeleteMapping("/itens/{itemId}")
 	public ResponseEntity<CarrinhoResponse> removerItem(@PathVariable Long clienteId, @PathVariable Long itemId) {
 		return ResponseEntity.ok(carrinhoService.removerItem(clienteId, itemId));

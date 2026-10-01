@@ -28,14 +28,6 @@ public class ItemCarrinho {
 	protected ItemCarrinho() {
 	}
 
-	/**
-	 * Construtor da classe ItemCarrinho.
-	 *
-	 * @param clienteId     ID do cliente dono do carrinho.
-	 * @param produtoId     ID do produto adicionado.
-	 * @param quantidade    Quantidade do produto.
-	 * @param precoUnitario Preço unitário do produto no momento da adição.
-	 */
 	public ItemCarrinho(Long clienteId, Long produtoId, Integer quantidade, BigDecimal precoUnitario) {
 		this.clienteId = clienteId;
 		this.produtoId = produtoId;
@@ -63,22 +55,11 @@ public class ItemCarrinho {
 		return precoUnitario;
 	}
 
-	/**
-	 * Calcula o subtotal do item (quantidade x preço unitário).
-	 *
-	 * @return Subtotal do item.
-	 */
 	public BigDecimal getSubtotal() {
 		return precoUnitario.multiply(BigDecimal.valueOf(quantidade));
 	}
 
-	/**
-	 * Acrescenta quantidade a um item já existente no carrinho, atualizando o preço unitário para o
-	 * preço atual do produto.
-	 *
-	 * @param quantidade    Quantidade a ser acrescentada.
-	 * @param precoUnitario Preço unitário atual do produto.
-	 */
+	/** Também atualiza o preço unitário pro preço atual do produto, não só soma a quantidade. */
 	public void adicionarQuantidade(Integer quantidade, BigDecimal precoUnitario) {
 		this.quantidade += quantidade;
 		this.precoUnitario = precoUnitario;
