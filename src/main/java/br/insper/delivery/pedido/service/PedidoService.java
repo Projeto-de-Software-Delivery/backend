@@ -54,6 +54,7 @@ public class PedidoService {
 	// que exista um calculo real de distancia/trafego.
 	private static final int ETA_RETIRADA_PADRAO_MIN = 15;
 	private static final String ENTREGADOR_STATUS_EM_ENTREGA = "EM_ENTREGA";
+	private static final String ENTREGADOR_STATUS_DISPONIVEL = "DISPONIVEL";
 
 	private final PedidoRepository pedidoRepository;
 	private final ItemPedidoRepository itemPedidoRepository;
@@ -132,16 +133,35 @@ public class PedidoService {
 		return aplicarTransicao(dados.pedidoId(), PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
 	}
 
+	/**
+	 * Fallback para quando a atribuição automática na aceitação não encontrou entregador: aplica a
+	 * atribuição vinda do payload (quem chama já escolheu o entregador).
+	 */
 	public PedidoResponse aplicarEntregaAceita(EntregaAceitaDados dados) {
-		return aplicarTransicao(dados.pedidoId(), PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		Pedido pedido = buscarEntidade(parseId(dados.pedidoId()));
+		try {
+			pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		} catch (IllegalStateException e) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+		}
+		pedido.atribuirEntregador(dados.entregadorId());
+		Pedido salvo = pedidoRepository.save(pedido);
+		log.info("Pedido {} transicionou de VALIDADO para ENTREGA_ACEITA (entregador {})", salvo.getId(),
+				dados.entregadorId());
+		return paraResponse(salvo, itemPedidoRepository.findByPedidoId(salvo.getId()));
 	}
 
 	public PedidoResponse aplicarPedidoRetirado(PedidoRetiradoDados dados) {
 		return aplicarTransicao(dados.pedidoId(), PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
 	}
 
+	/** Libera o entregador (volta a DISPONIVEL) depois de concluída a entrega. */
 	public PedidoResponse aplicarPedidoEntregue(PedidoEntregueDados dados) {
-		return aplicarTransicao(dados.pedidoId(), PedidoStatus.EM_ENTREGA, PedidoStatus.ENTREGUE);
+		PedidoResponse response = aplicarTransicao(dados.pedidoId(), PedidoStatus.EM_ENTREGA, PedidoStatus.ENTREGUE);
+		if (response.entregadorId() != null) {
+			entregadorClient.atualizarStatus(response.entregadorId(), ENTREGADOR_STATUS_DISPONIVEL);
+		}
+		return response;
 	}
 
 	public List<PedidoResponse> listarPorCliente(Long clienteId) {

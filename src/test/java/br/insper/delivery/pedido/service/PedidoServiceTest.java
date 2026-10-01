@@ -302,6 +302,7 @@ class PedidoServiceTest {
 		PedidoResponse response = pedidoService.aplicarEntregaAceita(dados);
 
 		assertThat(response.status()).isEqualTo(PedidoStatus.ENTREGA_ACEITA);
+		assertThat(response.entregadorId()).isEqualTo("31");
 	}
 
 	@Test
@@ -344,9 +345,10 @@ class PedidoServiceTest {
 	}
 
 	@Test
-	void aplicarPedidoEntregueDeveTransicionarDeEmEntregaParaEntregue() {
+	void aplicarPedidoEntregueDeveTransicionarDeEmEntregaParaEntregueELiberarEntregador() {
 		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
 		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		pedido.atribuirEntregador("31");
 		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
 		pedido.transicionar(PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
 		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
@@ -357,6 +359,23 @@ class PedidoServiceTest {
 		PedidoResponse response = pedidoService.aplicarPedidoEntregue(dados);
 
 		assertThat(response.status()).isEqualTo(PedidoStatus.ENTREGUE);
+		verify(entregadorClient).atualizarStatus("31", "DISPONIVEL");
+	}
+
+	@Test
+	void aplicarPedidoEntregueNaoLiberaEntregadorQuandoPedidoNaoTemUmAtribuido() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		pedido.transicionar(PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+		PedidoEntregueDados dados = new PedidoEntregueDados("1", "88", "31", Instant.now(), true);
+
+		pedidoService.aplicarPedidoEntregue(dados);
+
+		verify(entregadorClient, org.mockito.Mockito.never()).atualizarStatus(any(), any());
 	}
 
 	@Test
