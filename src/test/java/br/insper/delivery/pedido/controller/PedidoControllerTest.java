@@ -2,6 +2,7 @@ package br.insper.delivery.pedido.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -65,6 +66,14 @@ class PedidoControllerTest {
 	private String pedidoJson(Long lojaId, Long produtoId, int quantidade) {
 		return "{\"lojaId\":" + lojaId + ",\"itens\":[{\"produtoId\":" + produtoId + ",\"quantidade\":" + quantidade
 				+ "}],\"enderecoEntrega\":{\"rua\":\"Rua B, 2\",\"lat\":-23.5,\"lng\":-46.6}}";
+	}
+
+	private void atualizarEstoque(Long produtoId, Long lojaId, int quantidade) throws Exception {
+		mockMvc.perform(put("/produtos/" + produtoId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"lojaId\":" + lojaId + ",\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\","
+						+ "\"preco\":15.90,\"estoque\":" + quantidade + ",\"foto\":\"http://exemplo.com/foto.png\"}"))
+				.andExpect(status().isOk());
 	}
 
 	private Long criarPedido(Long clienteId, Long lojaId, Long produtoId, int quantidade) throws Exception {
@@ -246,15 +255,10 @@ class PedidoControllerTest {
 	void aceitarPedidoComEstoqueInsuficienteRetorna409ENaoAlteraStatus() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		MvcResult produtoResult = mockMvc
-				.perform(post("/produtos")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"lojaId\":" + lojaId + ",\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\","
-								+ "\"preco\":15.90,\"estoque\":1,\"foto\":\"http://exemplo.com/foto.png\"}"))
-				.andExpect(status().isCreated())
-				.andReturn();
-		Long produtoId = extrairId(produtoResult);
+		Long produtoId = criarProduto(lojaId);
 		Long pedidoId = criarPedido(clienteId, lojaId, produtoId, 2);
+		// estoque cai pra 1 depois da criação do pedido (ex.: outra venda consumiu o restante)
+		atualizarEstoque(produtoId, lojaId, 1);
 
 		mockMvc.perform(post("/lojas/" + lojaId + "/pedidos/" + pedidoId + "/aceitar")
 				.contentType(MediaType.APPLICATION_JSON)

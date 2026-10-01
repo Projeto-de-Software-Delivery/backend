@@ -59,7 +59,8 @@ public class PedidoService {
 	 * @param itemPedidoRepository Repositório de itens de pedido.
 	 * @param clienteService       Serviço de clientes, usado para validar o dono do pedido.
 	 * @param lojaService          Serviço de lojas, usado para validar a loja do pedido.
-	 * @param produtoService       Serviço de produtos, usado para validar e precificar os itens.
+	 * @param produtoService       Serviço de produtos, usado para validar, precificar e verificar
+	 *                             estoque dos itens.
 	 * @param eventPublisher       Publicador de eventos.
 	 */
 	public PedidoService(PedidoRepository pedidoRepository, ItemPedidoRepository itemPedidoRepository,
@@ -79,7 +80,9 @@ public class PedidoService {
 	 * @param clienteId ID do cliente que está fazendo o pedido.
 	 * @param request   Loja, itens e endereço de entrega do pedido.
 	 * @return Pedido criado.
-	 * @throws ResponseStatusException Se o cliente, a loja ou algum produto não forem encontrados.
+	 * @throws ResponseStatusException Se o cliente, a loja ou algum produto não forem encontrados,
+	 *                                 se algum produto não pertencer à loja informada ou não tiver
+	 *                                 estoque suficiente.
 	 */
 	public PedidoResponse criar(Long clienteId, CriarPedidoRequest request) {
 		clienteService.buscarPorId(clienteId);
@@ -94,6 +97,11 @@ public class PedidoService {
 					if (!produto.getLojaId().equals(request.lojaId())) {
 						throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 								"Produto " + produto.getId() + " não pertence à loja informada");
+					}
+					if (produto.getEstoque() < itemRequest.quantidade()) {
+						throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+								"Estoque insuficiente para o produto " + produto.getId() + ": disponível="
+										+ produto.getEstoque() + ", solicitado=" + itemRequest.quantidade());
 					}
 					return new ItemResolvido(itemRequest.produtoId(), itemRequest.quantidade(), produto.getPreco());
 				})
