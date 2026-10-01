@@ -32,63 +32,31 @@ public class ProdutoController {
 		this.produtoService = produtoService;
 	}
 
-	/**
-	 * Cria um novo produto.
-	 *
-	 * @param request Dados do produto a ser criado.
-	 * @return ResponseEntity com o produto criado.
-	 */
 	@PostMapping
 	public ResponseEntity<ProdutoResponse> criar(@Valid @RequestBody ProdutoRequest request) {
 		ProdutoResponse response = ProdutoResponse.from(produtoService.criar(request));
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 
-	/**
-	 * Lista os produtos do catálogo. Se {@code lojaId} for informado, lista apenas os produtos
-	 * dessa loja.
-	 *
-	 * @param lojaId ID da loja para filtrar, opcional.
-	 * @return ResponseEntity com a lista de produtos.
-	 */
+	/** Com lojaId informado, lista só os produtos dessa loja. */
 	@GetMapping
-	public ResponseEntity<List<ProdutoResponse>> listarTodos(
-			@RequestParam(required = false) Long lojaId) {
+	public ResponseEntity<List<ProdutoResponse>> listarTodos(@RequestParam(required = false) Long lojaId) {
 		List<ProdutoResponse> response = (lojaId != null ? produtoService.listarPorLoja(lojaId)
 				: produtoService.listarTodos()).stream().map(ProdutoResponse::from).toList();
 		return ResponseEntity.ok(response);
 	}
 
-	/**
-	 * Busca um produto pelo seu ID.
-	 *
-	 * @param id ID do produto a ser buscado.
-	 * @return ResponseEntity com o produto encontrado.
-	 */
 	@GetMapping("/{id}")
 	public ResponseEntity<ProdutoResponse> buscarPorId(@PathVariable Long id) {
 		return ResponseEntity.ok(ProdutoResponse.from(produtoService.buscarPorId(id)));
 	}
 
-	/**
-	 * Atualiza os dados de um produto existente.
-	 *
-	 * @param id      ID do produto a ser atualizado.
-	 * @param request Novos dados do produto.
-	 * @return ResponseEntity com o produto atualizado.
-	 */
 	@PutMapping("/{id}")
 	public ResponseEntity<ProdutoResponse> atualizar(@PathVariable Long id,
 			@Valid @RequestBody ProdutoRequest request) {
 		return ResponseEntity.ok(ProdutoResponse.from(produtoService.atualizar(id, request)));
 	}
 
-	/**
-	 * Remove um produto do catálogo.
-	 *
-	 * @param id ID do produto a ser removido.
-	 * @return ResponseEntity sem conteúdo.
-	 */
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> deletar(@PathVariable Long id) {
 		produtoService.deletar(id);

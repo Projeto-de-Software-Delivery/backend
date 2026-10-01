@@ -32,16 +32,6 @@ public class Produto {
 	protected Produto() {
 	}
 
-	/**
-	 * Construtor da classe Produto.
-	 *
-	 * @param lojaId    ID da loja dona do produto.
-	 * @param nome      Nome do produto.
-	 * @param categoria Categoria do produto no catálogo.
-	 * @param preco     Preço do produto.
-	 * @param estoque   Quantidade em estoque do produto.
-	 * @param foto      URL da foto do produto.
-	 */
 	public Produto(Long lojaId, String nome, String categoria, BigDecimal preco, Integer estoque, String foto) {
 		this.lojaId = lojaId;
 		this.nome = nome;
@@ -79,15 +69,7 @@ public class Produto {
 		return foto;
 	}
 
-	/**
-	 * Atualiza os dados do produto. A loja dona do produto não muda.
-	 *
-	 * @param nome      Nome do produto.
-	 * @param categoria Categoria do produto no catálogo.
-	 * @param preco     Preço do produto.
-	 * @param estoque   Quantidade em estoque do produto.
-	 * @param foto      URL da foto do produto.
-	 */
+	/** A loja dona do produto não muda. */
 	public void atualizar(String nome, String categoria, BigDecimal preco, Integer estoque, String foto) {
 		this.nome = nome;
 		this.categoria = categoria;
@@ -96,12 +78,7 @@ public class Produto {
 		this.foto = foto;
 	}
 
-	/**
-	 * Baixa uma quantidade do estoque do produto.
-	 *
-	 * @param quantidade Quantidade a ser baixada do estoque.
-	 * @throws IllegalStateException Se o estoque disponível for menor que a quantidade solicitada.
-	 */
+	/** @throws IllegalStateException se o estoque disponível for menor que a quantidade. */
 	public void baixarEstoque(Integer quantidade) {
 		if (this.estoque < quantidade) {
 			throw new IllegalStateException("Estoque insuficiente para o produto " + this.nome);

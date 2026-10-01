@@ -12,7 +12,7 @@ import jakarta.validation.constraints.NotNull;
  * o valor do frete e o tempo estimado de preparo.
  */
 public record AceitarPedidoRequest(
-		@NotNull @Valid EnderecoDados enderecoRetirada,
+		@NotNull @Valid EnderecoEntregaRequest enderecoRetirada,
 		@NotNull @DecimalMin(value = "0.0") BigDecimal valorFrete,
 		@NotNull @Min(0) Integer tempoPreparoMin) {
 }

@@ -30,7 +30,6 @@ import br.insper.delivery.pedido.domain.Pedido;
 import br.insper.delivery.pedido.domain.PedidoStatus;
 import br.insper.delivery.pedido.dto.AceitarPedidoRequest;
 import br.insper.delivery.pedido.dto.CriarPedidoRequest;
-import br.insper.delivery.pedido.dto.EnderecoDados;
 import br.insper.delivery.pedido.dto.EnderecoEntregaRequest;
 import br.insper.delivery.pedido.dto.EntregaAceitaDados;
 import br.insper.delivery.pedido.dto.ItemPedidoRequest;
@@ -253,8 +252,8 @@ class PedidoServiceTest {
 		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
 		when(pedidoRepository.save(pedido)).thenReturn(pedido);
 		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
-		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
-				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoEntregaRequest("Rua A, 1", -23.56, -46.65),
+				new EnderecoEntregaRequest("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
 
 		PedidoResponse response = pedidoService.aplicarPedidoValidado(dados);
 
@@ -266,8 +265,8 @@ class PedidoServiceTest {
 		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
 		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
 		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
-		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
-				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoEntregaRequest("Rua A, 1", -23.56, -46.65),
+				new EnderecoEntregaRequest("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
 
 		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
 				ResponseStatusException.class, () -> pedidoService.aplicarPedidoValidado(dados));
@@ -278,8 +277,8 @@ class PedidoServiceTest {
 	@Test
 	void aplicarPedidoValidadoDeveLancarQuandoPedidoNaoEncontrado() {
 		when(pedidoRepository.findById(1L)).thenReturn(Optional.empty());
-		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
-				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+		PedidoValidadoDados dados = new PedidoValidadoDados("1", "2", new EnderecoEntregaRequest("Rua A, 1", -23.56, -46.65),
+				new EnderecoEntregaRequest("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
 
 		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
 				() -> pedidoService.aplicarPedidoValidado(dados));
@@ -368,8 +367,8 @@ class PedidoServiceTest {
 
 	@Test
 	void aplicarTransicaoDeveLancarBadRequestQuandoPedidoIdInvalido() {
-		PedidoValidadoDados dados = new PedidoValidadoDados("abc", "2", new EnderecoDados("Rua A, 1", -23.56, -46.65),
-				new EnderecoDados("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
+		PedidoValidadoDados dados = new PedidoValidadoDados("abc", "2", new EnderecoEntregaRequest("Rua A, 1", -23.56, -46.65),
+				new EnderecoEntregaRequest("Rua B, 2", -23.5, -46.6), new BigDecimal("8.00"), 20);
 
 		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
 				ResponseStatusException.class, () -> pedidoService.aplicarPedidoValidado(dados));
@@ -378,7 +377,7 @@ class PedidoServiceTest {
 	}
 
 	private AceitarPedidoRequest aceitarPedidoRequestPadrao() {
-		return new AceitarPedidoRequest(new EnderecoDados("Rua A, 1", -23.56, -46.65), new BigDecimal("8.00"), 20);
+		return new AceitarPedidoRequest(new EnderecoEntregaRequest("Rua A, 1", -23.56, -46.65), new BigDecimal("8.00"), 20);
 	}
 
 	@Test

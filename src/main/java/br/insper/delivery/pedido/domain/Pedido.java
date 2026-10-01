@@ -45,17 +45,7 @@ public class Pedido {
 	protected Pedido() {
 	}
 
-	/**
-	 * Construtor da classe Pedido. O pedido é criado com status AGUARDANDO_VALIDACAO e um PIN de
-	 * entrega de 4 dígitos, que o entregador deve validar com o cliente ao finalizar a corrida.
-	 *
-	 * @param clienteId   ID do cliente que fez o pedido.
-	 * @param lojaId      ID da loja do pedido.
-	 * @param total       Valor total do pedido.
-	 * @param enderecoRua Logradouro do endereço de entrega.
-	 * @param enderecoLat Latitude do endereço de entrega.
-	 * @param enderecoLng Longitude do endereço de entrega.
-	 */
+	/** Status inicial sempre AGUARDANDO_VALIDACAO; gera também o PIN de entrega de 4 dígitos. */
 	public Pedido(Long clienteId, Long lojaId, BigDecimal total, String enderecoRua, Double enderecoLat,
 			Double enderecoLng) {
 		this.clienteId = clienteId;
@@ -109,13 +99,7 @@ public class Pedido {
 		return pin;
 	}
 
-	/**
-	 * Aplica uma transição de status, validando que o pedido está no status de origem esperado.
-	 *
-	 * @param statusEsperado Status em que o pedido deve estar para que a transição seja permitida.
-	 * @param novoStatus     Status para o qual o pedido deve transicionar.
-	 * @throws IllegalStateException Se o pedido não estiver no status esperado.
-	 */
+	/** @throws IllegalStateException se o pedido não estiver em statusEsperado. */
 	public void transicionar(PedidoStatus statusEsperado, PedidoStatus novoStatus) {
 		if (this.status != statusEsperado) {
 			throw new IllegalStateException(

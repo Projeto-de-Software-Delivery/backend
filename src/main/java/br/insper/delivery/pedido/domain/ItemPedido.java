@@ -28,14 +28,6 @@ public class ItemPedido {
 	protected ItemPedido() {
 	}
 
-	/**
-	 * Construtor da classe ItemPedido.
-	 *
-	 * @param pedidoId      ID do pedido dono do item.
-	 * @param produtoId     ID do produto pedido.
-	 * @param quantidade    Quantidade do produto.
-	 * @param precoUnitario Preço unitário do produto no momento do pedido.
-	 */
 	public ItemPedido(Long pedidoId, Long produtoId, Integer quantidade, BigDecimal precoUnitario) {
 		this.pedidoId = pedidoId;
 		this.produtoId = produtoId;
@@ -55,11 +47,6 @@ public class ItemPedido {
 		return precoUnitario;
 	}
 
-	/**
-	 * Calcula o subtotal do item (quantidade x preço unitário).
-	 *
-	 * @return Subtotal do item.
-	 */
 	public BigDecimal getSubtotal() {
 		return precoUnitario.multiply(BigDecimal.valueOf(quantidade));
 	}

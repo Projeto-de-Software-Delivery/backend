@@ -13,13 +13,6 @@ import br.insper.delivery.pedido.domain.Pedido;
 public record PedidoCriadoEvento(String eventId, String eventType, int version, Instant occurredAt,
 		PedidoCriadoDados data) {
 
-	/**
-	 * Monta o envelope do evento pedido.criado a partir do pedido recém-criado e seus itens.
-	 *
-	 * @param pedido Pedido criado.
-	 * @param itens  Itens do pedido criado.
-	 * @return Envelope pronto para publicação.
-	 */
 	public static PedidoCriadoEvento de(Pedido pedido, List<ItemPedido> itens) {
 		List<ItemPedidoDados> itensDados = itens.stream()
 				.map(item -> new ItemPedidoDados(String.valueOf(item.getProdutoId()), item.getQuantidade(),

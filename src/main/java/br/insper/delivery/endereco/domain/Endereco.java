@@ -34,18 +34,6 @@ public class Endereco {
 	protected Endereco() {
 	}
 
-	/**
-	 * Construtor da classe Endereco.
-	 *
-	 * @param clienteId   ID do cliente dono do endereço.
-	 * @param cep         CEP do endereço.
-	 * @param logradouro  Logradouro do endereço.
-	 * @param numero      Número do endereço.
-	 * @param complemento Complemento do endereço.
-	 * @param bairro      Bairro do endereço.
-	 * @param cidade      Cidade do endereço.
-	 * @param estado      Estado (UF) do endereço.
-	 */
 	public Endereco(Long clienteId, String cep, String logradouro, String numero, String complemento, String bairro,
 			String cidade, String estado) {
 		this.clienteId = clienteId;
@@ -94,17 +82,6 @@ public class Endereco {
 		return estado;
 	}
 
-	/**
-	 * Atualiza os dados do endereço.
-	 *
-	 * @param cep         CEP do endereço.
-	 * @param logradouro  Logradouro do endereço.
-	 * @param numero      Número do endereço.
-	 * @param complemento Complemento do endereço.
-	 * @param bairro      Bairro do endereço.
-	 * @param cidade      Cidade do endereço.
-	 * @param estado      Estado (UF) do endereço.
-	 */
 	public void atualizar(String cep, String logradouro, String numero, String complemento, String bairro,
 			String cidade, String estado) {
 		this.cep = cep;

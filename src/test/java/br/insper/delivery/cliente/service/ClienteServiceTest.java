@@ -13,12 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.domain.Cliente;
 import br.insper.delivery.cliente.dto.ClienteRequest;
-import br.insper.delivery.cliente.event.ClienteCriadoEvent;
 import br.insper.delivery.cliente.repository.ClienteRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,14 +25,11 @@ class ClienteServiceTest {
 	@Mock
 	private ClienteRepository clienteRepository;
 
-	@Mock
-	private ApplicationEventPublisher eventPublisher;
-
 	@InjectMocks
 	private ClienteService clienteService;
 
 	@Test
-	void criarDevePersistirEPublicarEvento() {
+	void criarDevePersistirCliente() {
 		ClienteRequest request = new ClienteRequest("Ana", "ana@email.com", "11999999999");
 		Cliente salvo = new Cliente("Ana", "ana@email.com", "11999999999");
 		when(clienteRepository.save(any(Cliente.class))).thenReturn(salvo);
@@ -42,7 +37,6 @@ class ClienteServiceTest {
 		Cliente resultado = clienteService.criar(request);
 
 		assertThat(resultado.getEmail()).isEqualTo("ana@email.com");
-		verify(eventPublisher).publishEvent(any(ClienteCriadoEvent.class));
 	}
 
 	@Test

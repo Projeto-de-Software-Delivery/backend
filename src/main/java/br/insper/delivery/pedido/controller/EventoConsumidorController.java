@@ -16,9 +16,10 @@ import br.insper.delivery.pedido.service.PedidoService;
 import jakarta.validation.Valid;
 
 /**
- * Consome os eventos dos demais tópicos da arquitetura (payloads.md) e aplica as transições
- * correspondentes na máquina de estados do pedido. Como ainda não há um broker de mensageria
- * configurado, os eventos são recebidos via HTTP nesses endpoints.
+ * Consome os eventos dos tópicos de payloads.md que ainda não têm um @RabbitListener real
+ * (pedido.validado é publicado de verdade pela KAN-34; os outros três dependem do serviço de
+ * entregador, que ainda não existe) e aplica as transições correspondentes na máquina de
+ * estados do pedido.
  */
 @RestController
 @RequestMapping("/eventos")
@@ -30,48 +31,28 @@ public class EventoConsumidorController {
 		this.pedidoService = pedidoService;
 	}
 
-	/**
-	 * Consome o evento pedido.validado (loja aceitou e baixou o estoque).
-	 *
-	 * @param evento Envelope do evento pedido.validado.
-	 * @return ResponseEntity com o pedido atualizado.
-	 */
+	/** Loja aceitou e baixou o estoque. */
 	@PostMapping("/pedido-validado")
 	public ResponseEntity<PedidoResponse> pedidoValidado(
 			@Valid @RequestBody EventoRecebido<PedidoValidadoDados> evento) {
 		return ResponseEntity.ok(pedidoService.aplicarPedidoValidado(evento.data()));
 	}
 
-	/**
-	 * Consome o evento entrega.aceita (um entregador pegou a corrida).
-	 *
-	 * @param evento Envelope do evento entrega.aceita.
-	 * @return ResponseEntity com o pedido atualizado.
-	 */
+	/** Um entregador pegou a corrida. */
 	@PostMapping("/entrega-aceita")
 	public ResponseEntity<PedidoResponse> entregaAceita(
 			@Valid @RequestBody EventoRecebido<EntregaAceitaDados> evento) {
 		return ResponseEntity.ok(pedidoService.aplicarEntregaAceita(evento.data()));
 	}
 
-	/**
-	 * Consome o evento pedido.retirado (entregador saiu da loja com o pedido).
-	 *
-	 * @param evento Envelope do evento pedido.retirado.
-	 * @return ResponseEntity com o pedido atualizado.
-	 */
+	/** Entregador saiu da loja com o pedido. */
 	@PostMapping("/pedido-retirado")
 	public ResponseEntity<PedidoResponse> pedidoRetirado(
 			@Valid @RequestBody EventoRecebido<PedidoRetiradoDados> evento) {
 		return ResponseEntity.ok(pedidoService.aplicarPedidoRetirado(evento.data()));
 	}
 
-	/**
-	 * Consome o evento pedido.entregue (PIN validado e entrega finalizada).
-	 *
-	 * @param evento Envelope do evento pedido.entregue.
-	 * @return ResponseEntity com o pedido atualizado.
-	 */
+	/** PIN validado e entrega finalizada. */
 	@PostMapping("/pedido-entregue")
 	public ResponseEntity<PedidoResponse> pedidoEntregue(
 			@Valid @RequestBody EventoRecebido<PedidoEntregueDados> evento) {

@@ -12,8 +12,8 @@ import jakarta.validation.constraints.NotNull;
 public record PedidoValidadoDados(
 		@NotBlank String pedidoId,
 		@NotBlank String lojaId,
-		@NotNull @Valid EnderecoDados enderecoRetirada,
-		@NotNull @Valid EnderecoDados enderecoEntrega,
+		@NotNull @Valid EnderecoEntregaRequest enderecoRetirada,
+		@NotNull @Valid EnderecoEntregaRequest enderecoEntrega,
 		@NotNull BigDecimal valorFrete,
 		@NotNull Integer tempoPreparoMin) {
 }

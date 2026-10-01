@@ -15,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -23,7 +22,6 @@ import br.insper.delivery.loja.domain.Loja;
 import br.insper.delivery.loja.service.LojaService;
 import br.insper.delivery.produto.domain.Produto;
 import br.insper.delivery.produto.dto.ProdutoRequest;
-import br.insper.delivery.produto.event.ProdutoCriadoEvent;
 import br.insper.delivery.produto.repository.ProdutoRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,16 +33,13 @@ class ProdutoServiceTest {
 	@Mock
 	private LojaService lojaService;
 
-	@Mock
-	private ApplicationEventPublisher eventPublisher;
-
 	@InjectMocks
 	private ProdutoService produtoService;
 
 	private static final Loja LOJA = new Loja("Padaria", "12345678000199", "Rua A, 1");
 
 	@Test
-	void criarDevePersistirEPublicarEvento() {
+	void criarDevePersistirProduto() {
 		when(lojaService.buscarPorId(7L)).thenReturn(LOJA);
 		ProdutoRequest request = new ProdutoRequest(7L, "Bolo de chocolate", "Sobremesas", new BigDecimal("25.90"),
 				10, "http://exemplo.com/foto.png");
@@ -57,7 +52,6 @@ class ProdutoServiceTest {
 		assertThat(resultado.getNome()).isEqualTo("Bolo de chocolate");
 		assertThat(resultado.getLojaId()).isEqualTo(7L);
 		assertThat(resultado.getEstoque()).isEqualTo(10);
-		verify(eventPublisher).publishEvent(any(ProdutoCriadoEvent.class));
 	}
 
 	@Test
