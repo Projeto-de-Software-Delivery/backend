@@ -3,6 +3,8 @@ package br.insper.delivery.pedido.service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -14,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.service.ClienteService;
+import br.insper.delivery.entregador.EntregadorClient;
+import br.insper.delivery.entregador.EntregadorDados;
 import br.insper.delivery.loja.service.LojaService;
 import br.insper.delivery.pedido.domain.ItemPedido;
 import br.insper.delivery.pedido.domain.Pedido;
@@ -28,6 +32,8 @@ import br.insper.delivery.pedido.dto.PedidoEntregueDados;
 import br.insper.delivery.pedido.dto.PedidoResponse;
 import br.insper.delivery.pedido.dto.PedidoRetiradoDados;
 import br.insper.delivery.pedido.dto.PedidoValidadoDados;
+import br.insper.delivery.pedido.event.EntregaAceitaEvent;
+import br.insper.delivery.pedido.event.EntregaAceitaEvento;
 import br.insper.delivery.pedido.event.PedidoCriadoEvent;
 import br.insper.delivery.pedido.event.PedidoCriadoEvento;
 import br.insper.delivery.pedido.event.PedidoValidadoEvent;
@@ -44,22 +50,29 @@ import br.insper.delivery.produto.service.ProdutoService;
 public class PedidoService {
 
 	private static final Logger log = LoggerFactory.getLogger(PedidoService.class);
+	// ponytail: sem integracao com mapas (fora do escopo do servico de entregador); ETA fixo ate
+	// que exista um calculo real de distancia/trafego.
+	private static final int ETA_RETIRADA_PADRAO_MIN = 15;
+	private static final String ENTREGADOR_STATUS_EM_ENTREGA = "EM_ENTREGA";
+	private static final String ENTREGADOR_STATUS_DISPONIVEL = "DISPONIVEL";
 
 	private final PedidoRepository pedidoRepository;
 	private final ItemPedidoRepository itemPedidoRepository;
 	private final ClienteService clienteService;
 	private final LojaService lojaService;
 	private final ProdutoService produtoService;
+	private final EntregadorClient entregadorClient;
 	private final ApplicationEventPublisher eventPublisher;
 
 	public PedidoService(PedidoRepository pedidoRepository, ItemPedidoRepository itemPedidoRepository,
 			ClienteService clienteService, LojaService lojaService, ProdutoService produtoService,
-			ApplicationEventPublisher eventPublisher) {
+			EntregadorClient entregadorClient, ApplicationEventPublisher eventPublisher) {
 		this.pedidoRepository = pedidoRepository;
 		this.itemPedidoRepository = itemPedidoRepository;
 		this.clienteService = clienteService;
 		this.lojaService = lojaService;
 		this.produtoService = produtoService;
+		this.entregadorClient = entregadorClient;
 		this.eventPublisher = eventPublisher;
 	}
 
@@ -120,16 +133,35 @@ public class PedidoService {
 		return aplicarTransicao(dados.pedidoId(), PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
 	}
 
+	/**
+	 * Fallback para quando a atribuição automática na aceitação não encontrou entregador: aplica a
+	 * atribuição vinda do payload (quem chama já escolheu o entregador).
+	 */
 	public PedidoResponse aplicarEntregaAceita(EntregaAceitaDados dados) {
-		return aplicarTransicao(dados.pedidoId(), PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		Pedido pedido = buscarEntidade(parseId(dados.pedidoId()));
+		try {
+			pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		} catch (IllegalStateException e) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+		}
+		pedido.atribuirEntregador(dados.entregadorId());
+		Pedido salvo = pedidoRepository.save(pedido);
+		log.info("Pedido {} transicionou de VALIDADO para ENTREGA_ACEITA (entregador {})", salvo.getId(),
+				dados.entregadorId());
+		return paraResponse(salvo, itemPedidoRepository.findByPedidoId(salvo.getId()));
 	}
 
 	public PedidoResponse aplicarPedidoRetirado(PedidoRetiradoDados dados) {
 		return aplicarTransicao(dados.pedidoId(), PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
 	}
 
+	/** Libera o entregador (volta a DISPONIVEL) depois de concluída a entrega. */
 	public PedidoResponse aplicarPedidoEntregue(PedidoEntregueDados dados) {
-		return aplicarTransicao(dados.pedidoId(), PedidoStatus.EM_ENTREGA, PedidoStatus.ENTREGUE);
+		PedidoResponse response = aplicarTransicao(dados.pedidoId(), PedidoStatus.EM_ENTREGA, PedidoStatus.ENTREGUE);
+		if (response.entregadorId() != null) {
+			entregadorClient.atualizarStatus(response.entregadorId(), ENTREGADOR_STATUS_DISPONIVEL);
+		}
+		return response;
 	}
 
 	public List<PedidoResponse> listarPorCliente(Long clienteId) {
@@ -148,7 +180,8 @@ public class PedidoService {
 
 	/**
 	 * Tudo-ou-nada: se a baixa de estoque falhar, nada é persistido (nem o estoque, nem a
-	 * transição pra VALIDADO).
+	 * transição pra VALIDADO). Depois de validado, tenta atribuir um entregador disponível na
+	 * hora; se nenhum estiver livre, o pedido fica em VALIDADO aguardando uma nova tentativa.
 	 */
 	@Transactional
 	public PedidoResponse aceitar(Long lojaId, Long pedidoId, AceitarPedidoRequest request) {
@@ -165,8 +198,9 @@ public class PedidoService {
 		produtoService.baixarEstoque(quantidadesPorProduto);
 
 		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		atribuirEntregadorDisponivel(pedido);
 		Pedido salvo = pedidoRepository.save(pedido);
-		log.info("Pedido {} aceito pela loja {} e transicionou para VALIDADO", salvo.getId(), lojaId);
+		log.info("Pedido {} aceito pela loja {} e transicionou para {}", salvo.getId(), lojaId, salvo.getStatus());
 
 		EnderecoEntregaRequest enderecoEntrega = new EnderecoEntregaRequest(salvo.getEnderecoRua(),
 				salvo.getEnderecoLat(), salvo.getEnderecoLng());
@@ -175,6 +209,30 @@ public class PedidoService {
 		eventPublisher.publishEvent(new PedidoValidadoEvent(this, PedidoValidadoEvento.de(dados)));
 
 		return paraResponse(salvo, itens);
+	}
+
+	/**
+	 * Serviço de entregador só tem CRUD + status (sem fila nem endpoint de oferta), então a
+	 * "oferta de corrida" vira uma atribuição direta: pega o primeiro DISPONIVEL e marca ocupado.
+	 */
+	private void atribuirEntregadorDisponivel(Pedido pedido) {
+		Optional<EntregadorDados> entregador = entregadorClient.buscarDisponivel();
+		if (entregador.isEmpty()) {
+			log.warn("Nenhum entregador disponível para o pedido {} no momento da aceitação", pedido.getId());
+			return;
+		}
+
+		EntregadorDados escolhido = entregador.get();
+		entregadorClient.atualizarStatus(escolhido.id(), ENTREGADOR_STATUS_EM_ENTREGA);
+		pedido.atribuirEntregador(escolhido.id());
+		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		log.info("Pedido {} atribuído ao entregador {}", pedido.getId(), escolhido.id());
+
+		// payloads.md exemplifica veiculo em minusculo; o servico de entregador usa maiusculo.
+		EntregaAceitaDados dados = new EntregaAceitaDados(String.valueOf(pedido.getId()),
+				UUID.randomUUID().toString(), escolhido.id(), escolhido.nome(),
+				escolhido.veiculo().toLowerCase(), ETA_RETIRADA_PADRAO_MIN);
+		eventPublisher.publishEvent(new EntregaAceitaEvent(this, EntregaAceitaEvento.de(dados)));
 	}
 
 	/** Nenhum estoque é alterado — ele só é baixado na aceitação, nunca antes. */
@@ -230,6 +288,7 @@ public class PedidoService {
 		EnderecoEntregaResponse enderecoEntrega = new EnderecoEntregaResponse(pedido.getEnderecoRua(),
 				pedido.getEnderecoLat(), pedido.getEnderecoLng());
 		return new PedidoResponse(pedido.getId(), pedido.getClienteId(), pedido.getLojaId(), itensResponse,
-				pedido.getTotal(), enderecoEntrega, pedido.getStatus(), pedido.getDataCriacao(), pedido.getPin());
+				pedido.getTotal(), enderecoEntrega, pedido.getStatus(), pedido.getDataCriacao(), pedido.getPin(),
+				pedido.getEntregadorId());
 	}
 }

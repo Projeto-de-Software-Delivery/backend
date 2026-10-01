@@ -42,6 +42,8 @@ public class Pedido {
 
 	private String pin;
 
+	private String entregadorId;
+
 	protected Pedido() {
 	}
 
@@ -97,6 +99,14 @@ public class Pedido {
 
 	public String getPin() {
 		return pin;
+	}
+
+	public String getEntregadorId() {
+		return entregadorId;
+	}
+
+	public void atribuirEntregador(String entregadorId) {
+		this.entregadorId = entregadorId;
 	}
 
 	/** @throws IllegalStateException se o pedido não estiver em statusEsperado. */

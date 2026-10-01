@@ -92,4 +92,5 @@ jobs:
               -e RABBITMQ_PORT=5672 \
               -e RABBITMQ_USER=guest \
               -e RABBITMQ_PASSWORD=guest \
+              -e ENTREGADOR_SERVICE_URL=http://3.239.184.234:8081 \
               emilybrtt/delivery:${{ github.sha }}

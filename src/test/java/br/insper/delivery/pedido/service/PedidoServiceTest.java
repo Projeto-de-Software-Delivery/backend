@@ -23,6 +23,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.domain.Cliente;
 import br.insper.delivery.cliente.service.ClienteService;
+import br.insper.delivery.entregador.EntregadorClient;
+import br.insper.delivery.entregador.EntregadorDados;
 import br.insper.delivery.loja.domain.Loja;
 import br.insper.delivery.loja.service.LojaService;
 import br.insper.delivery.pedido.domain.ItemPedido;
@@ -37,6 +39,7 @@ import br.insper.delivery.pedido.dto.PedidoEntregueDados;
 import br.insper.delivery.pedido.dto.PedidoResponse;
 import br.insper.delivery.pedido.dto.PedidoRetiradoDados;
 import br.insper.delivery.pedido.dto.PedidoValidadoDados;
+import br.insper.delivery.pedido.event.EntregaAceitaEvent;
 import br.insper.delivery.pedido.event.PedidoCriadoEvent;
 import br.insper.delivery.pedido.event.PedidoValidadoEvent;
 import br.insper.delivery.pedido.repository.ItemPedidoRepository;
@@ -61,6 +64,9 @@ class PedidoServiceTest {
 
 	@Mock
 	private ProdutoService produtoService;
+
+	@Mock
+	private EntregadorClient entregadorClient;
 
 	@Mock
 	private ApplicationEventPublisher eventPublisher;
@@ -296,6 +302,7 @@ class PedidoServiceTest {
 		PedidoResponse response = pedidoService.aplicarEntregaAceita(dados);
 
 		assertThat(response.status()).isEqualTo(PedidoStatus.ENTREGA_ACEITA);
+		assertThat(response.entregadorId()).isEqualTo("31");
 	}
 
 	@Test
@@ -338,9 +345,10 @@ class PedidoServiceTest {
 	}
 
 	@Test
-	void aplicarPedidoEntregueDeveTransicionarDeEmEntregaParaEntregue() {
+	void aplicarPedidoEntregueDeveTransicionarDeEmEntregaParaEntregueELiberarEntregador() {
 		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
 		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		pedido.atribuirEntregador("31");
 		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
 		pedido.transicionar(PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
 		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
@@ -351,6 +359,23 @@ class PedidoServiceTest {
 		PedidoResponse response = pedidoService.aplicarPedidoEntregue(dados);
 
 		assertThat(response.status()).isEqualTo(PedidoStatus.ENTREGUE);
+		verify(entregadorClient).atualizarStatus("31", "DISPONIVEL");
+	}
+
+	@Test
+	void aplicarPedidoEntregueNaoLiberaEntregadorQuandoPedidoNaoTemUmAtribuido() {
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		pedido.transicionar(PedidoStatus.VALIDADO, PedidoStatus.ENTREGA_ACEITA);
+		pedido.transicionar(PedidoStatus.ENTREGA_ACEITA, PedidoStatus.EM_ENTREGA);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+		PedidoEntregueDados dados = new PedidoEntregueDados("1", "88", "31", Instant.now(), true);
+
+		pedidoService.aplicarPedidoEntregue(dados);
+
+		verify(entregadorClient, org.mockito.Mockito.never()).atualizarStatus(any(), any());
 	}
 
 	@Test
@@ -392,8 +417,28 @@ class PedidoServiceTest {
 		PedidoResponse response = pedidoService.aceitar(2L, 1L, aceitarPedidoRequestPadrao());
 
 		assertThat(response.status()).isEqualTo(PedidoStatus.VALIDADO);
+		assertThat(response.entregadorId()).isNull();
 		verify(produtoService).baixarEstoque(anyMap());
 		verify(eventPublisher).publishEvent(any(PedidoValidadoEvent.class));
+	}
+
+	@Test
+	void aceitarDeveAtribuirEntregadorDisponivelETransicionarParaEntregaAceita() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		ItemPedido item = new ItemPedido(1L, 9L, 2, new BigDecimal("15.90"));
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of(item));
+		EntregadorDados disponivel = new EntregadorDados("31", "João", "MOTO", "DISPONIVEL");
+		when(entregadorClient.buscarDisponivel()).thenReturn(Optional.of(disponivel));
+
+		PedidoResponse response = pedidoService.aceitar(2L, 1L, aceitarPedidoRequestPadrao());
+
+		assertThat(response.status()).isEqualTo(PedidoStatus.ENTREGA_ACEITA);
+		assertThat(response.entregadorId()).isEqualTo("31");
+		verify(entregadorClient).atualizarStatus("31", "EM_ENTREGA");
+		verify(eventPublisher).publishEvent(any(EntregaAceitaEvent.class));
 	}
 
 	@Test
