@@ -160,6 +160,20 @@ class PedidoServiceTest {
 	}
 
 	@Test
+	void criarDeveLancarUnprocessableEntityQuandoEstoqueInsuficiente() {
+		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		// requestPadrao pede quantidade 2, mas estoque só tem 1
+		Produto produto = new Produto(2L, "Bolo", "Sobremesas", new BigDecimal("15.90"), 1, "foto.png");
+		when(produtoService.buscarPorId(9L)).thenReturn(produto);
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.criar(1L, requestPadrao()));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+	}
+
+	@Test
 	void buscarPorIdDeveRetornarPedidoComItens() {
 		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
 		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));

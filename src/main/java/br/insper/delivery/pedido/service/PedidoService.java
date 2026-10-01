@@ -78,6 +78,11 @@ public class PedidoService {
 						throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 								"Produto " + produto.getId() + " não pertence à loja informada");
 					}
+					if (produto.getEstoque() < itemRequest.quantidade()) {
+						throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+								"Estoque insuficiente para o produto " + produto.getId() + ": disponível="
+										+ produto.getEstoque() + ", solicitado=" + itemRequest.quantidade());
+					}
 					return new ItemResolvido(itemRequest.produtoId(), itemRequest.quantidade(), produto.getPreco());
 				})
 				.toList();
