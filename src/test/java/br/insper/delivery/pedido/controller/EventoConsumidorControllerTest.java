@@ -1,7 +1,6 @@
 package br.insper.delivery.pedido.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,29 +51,21 @@ class EventoConsumidorControllerTest {
 		return extrairId(result);
 	}
 
-	private Long criarProduto() throws Exception {
+	private Long criarProduto(Long lojaId) throws Exception {
 		MvcResult result = mockMvc
 				.perform(post("/produtos")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\",\"preco\":15.90,"
-								+ "\"foto\":\"http://exemplo.com/foto.png\"}"))
+						.content("{\"lojaId\":" + lojaId + ",\"nome\":\"Bolo\",\"categoria\":\"Sobremesas\","
+								+ "\"preco\":15.90,\"estoque\":100,\"foto\":\"http://exemplo.com/foto.png\"}"))
 				.andExpect(status().isCreated())
 				.andReturn();
 		return extrairId(result);
 	}
 
-	private void adicionarEstoque(Long lojaId, Long produtoId, int quantidade) throws Exception {
-		mockMvc.perform(put("/lojas/" + lojaId + "/estoque")
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"produtoId\":" + produtoId + ",\"quantidade\":" + quantidade + "}"))
-				.andExpect(status().isOk());
-	}
-
 	private Long criarPedido() throws Exception {
 		Long clienteId = criarCliente();
 		Long lojaId = criarLoja();
-		Long produtoId = criarProduto();
-		adicionarEstoque(lojaId, produtoId, 10);
+		Long produtoId = criarProduto(lojaId);
 		MvcResult result = mockMvc
 				.perform(post("/clientes/" + clienteId + "/pedidos")
 						.contentType(MediaType.APPLICATION_JSON)

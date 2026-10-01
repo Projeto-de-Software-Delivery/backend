@@ -2,22 +2,25 @@ package br.insper.delivery.pedido.service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.service.ClienteService;
-import br.insper.delivery.loja.domain.EstoqueLoja;
-import br.insper.delivery.loja.service.EstoqueLojaService;
 import br.insper.delivery.loja.service.LojaService;
 import br.insper.delivery.pedido.domain.ItemPedido;
 import br.insper.delivery.pedido.domain.Pedido;
 import br.insper.delivery.pedido.domain.PedidoStatus;
+import br.insper.delivery.pedido.dto.AceitarPedidoRequest;
 import br.insper.delivery.pedido.dto.CriarPedidoRequest;
+import br.insper.delivery.pedido.dto.EnderecoDados;
 import br.insper.delivery.pedido.dto.EnderecoEntregaResponse;
 import br.insper.delivery.pedido.dto.EntregaAceitaDados;
 import br.insper.delivery.pedido.dto.ItemPedidoResponse;
@@ -27,6 +30,8 @@ import br.insper.delivery.pedido.dto.PedidoRetiradoDados;
 import br.insper.delivery.pedido.dto.PedidoValidadoDados;
 import br.insper.delivery.pedido.event.PedidoCriadoEvent;
 import br.insper.delivery.pedido.event.PedidoCriadoEvento;
+import br.insper.delivery.pedido.event.PedidoValidadoEvent;
+import br.insper.delivery.pedido.event.PedidoValidadoEvento;
 import br.insper.delivery.pedido.repository.ItemPedidoRepository;
 import br.insper.delivery.pedido.repository.PedidoRepository;
 import br.insper.delivery.produto.domain.Produto;
@@ -45,7 +50,6 @@ public class PedidoService {
 	private final ClienteService clienteService;
 	private final LojaService lojaService;
 	private final ProdutoService produtoService;
-	private final EstoqueLojaService estoqueLojaService;
 	private final ApplicationEventPublisher eventPublisher;
 
 	/**
@@ -55,19 +59,18 @@ public class PedidoService {
 	 * @param itemPedidoRepository Repositório de itens de pedido.
 	 * @param clienteService       Serviço de clientes, usado para validar o dono do pedido.
 	 * @param lojaService          Serviço de lojas, usado para validar a loja do pedido.
-	 * @param produtoService       Serviço de produtos, usado para validar e precificar os itens.
-	 * @param estoqueLojaService   Serviço de estoque, usado para verificar disponibilidade dos itens.
+	 * @param produtoService       Serviço de produtos, usado para validar, precificar e verificar
+	 *                             estoque dos itens.
 	 * @param eventPublisher       Publicador de eventos.
 	 */
 	public PedidoService(PedidoRepository pedidoRepository, ItemPedidoRepository itemPedidoRepository,
 			ClienteService clienteService, LojaService lojaService, ProdutoService produtoService,
-			EstoqueLojaService estoqueLojaService, ApplicationEventPublisher eventPublisher) {
+			ApplicationEventPublisher eventPublisher) {
 		this.pedidoRepository = pedidoRepository;
 		this.itemPedidoRepository = itemPedidoRepository;
 		this.clienteService = clienteService;
 		this.lojaService = lojaService;
 		this.produtoService = produtoService;
-		this.estoqueLojaService = estoqueLojaService;
 		this.eventPublisher = eventPublisher;
 	}
 
@@ -78,7 +81,8 @@ public class PedidoService {
 	 * @param request   Loja, itens e endereço de entrega do pedido.
 	 * @return Pedido criado.
 	 * @throws ResponseStatusException Se o cliente, a loja ou algum produto não forem encontrados,
-	 *                                 ou se algum produto não estiver disponível no estoque da loja.
+	 *                                 se algum produto não pertencer à loja informada ou não tiver
+	 *                                 estoque suficiente.
 	 */
 	public PedidoResponse criar(Long clienteId, CriarPedidoRequest request) {
 		clienteService.buscarPorId(clienteId);
@@ -90,13 +94,14 @@ public class PedidoService {
 		List<ItemResolvido> resolvidos = request.itens().stream()
 				.map(itemRequest -> {
 					Produto produto = produtoService.buscarPorId(itemRequest.produtoId());
-					EstoqueLoja estoque = estoqueLojaService.buscarPorLojaEProduto(
-							request.lojaId(), itemRequest.produtoId());
-					if (!estoque.temEstoqueSuficiente(itemRequest.quantidade())) {
+					if (!produto.getLojaId().equals(request.lojaId())) {
+						throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+								"Produto " + produto.getId() + " não pertence à loja informada");
+					}
+					if (produto.getEstoque() < itemRequest.quantidade()) {
 						throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-								"Estoque insuficiente para o produto " + itemRequest.produtoId()
-										+ ": disponível=" + estoque.getQuantidade()
-										+ ", solicitado=" + itemRequest.quantidade());
+								"Estoque insuficiente para o produto " + produto.getId() + ": disponível="
+										+ produto.getEstoque() + ", solicitado=" + itemRequest.quantidade());
 					}
 					return new ItemResolvido(itemRequest.produtoId(), itemRequest.quantidade(), produto.getPreco());
 				})
@@ -203,6 +208,90 @@ public class PedidoService {
 				.toList();
 	}
 
+	/**
+	 * Lista os pedidos de uma loja que ainda aguardam validação (painel da loja).
+	 *
+	 * @param lojaId ID da loja.
+	 * @return Lista de pedidos pendentes da loja.
+	 * @throws ResponseStatusException Se a loja não for encontrada.
+	 */
+	public List<PedidoResponse> listarPendentesPorLoja(Long lojaId) {
+		lojaService.buscarPorId(lojaId);
+		return pedidoRepository.findByLojaIdAndStatus(lojaId, PedidoStatus.AGUARDANDO_VALIDACAO).stream()
+				.map(pedido -> paraResponse(pedido, itemPedidoRepository.findByPedidoId(pedido.getId())))
+				.toList();
+	}
+
+	/**
+	 * A loja aceita um pedido pendente: baixa o estoque dos itens, transiciona o pedido de
+	 * AGUARDANDO_VALIDACAO para VALIDADO e publica o evento pedido.validado.
+	 *
+	 * @param lojaId   ID da loja que está aceitando o pedido.
+	 * @param pedidoId ID do pedido a ser aceito.
+	 * @param request  Endereço de retirada, valor do frete e tempo de preparo informados pela loja.
+	 * @return Pedido atualizado.
+	 * @throws ResponseStatusException Se a loja ou o pedido não forem encontrados, se o pedido não
+	 *                                  pertencer à loja, se ele não estiver aguardando validação ou
+	 *                                  se algum item não tiver estoque suficiente.
+	 */
+	@Transactional
+	public PedidoResponse aceitar(Long lojaId, Long pedidoId, AceitarPedidoRequest request) {
+		lojaService.buscarPorId(lojaId);
+		Pedido pedido = buscarEntidadeDaLoja(lojaId, pedidoId);
+		if (pedido.getStatus() != PedidoStatus.AGUARDANDO_VALIDACAO) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT,
+					"Pedido está em " + pedido.getStatus() + ", esperado AGUARDANDO_VALIDACAO para aceitar");
+		}
+
+		List<ItemPedido> itens = itemPedidoRepository.findByPedidoId(pedido.getId());
+		Map<Long, Integer> quantidadesPorProduto = itens.stream()
+				.collect(Collectors.toMap(ItemPedido::getProdutoId, ItemPedido::getQuantidade, Integer::sum));
+		produtoService.baixarEstoque(quantidadesPorProduto);
+
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		Pedido salvo = pedidoRepository.save(pedido);
+		log.info("Pedido {} aceito pela loja {} e transicionou para VALIDADO", salvo.getId(), lojaId);
+
+		EnderecoDados enderecoEntrega = new EnderecoDados(salvo.getEnderecoRua(), salvo.getEnderecoLat(),
+				salvo.getEnderecoLng());
+		PedidoValidadoDados dados = new PedidoValidadoDados(String.valueOf(salvo.getId()), String.valueOf(lojaId),
+				request.enderecoRetirada(), enderecoEntrega, request.valorFrete(), request.tempoPreparoMin());
+		eventPublisher.publishEvent(new PedidoValidadoEvent(this, PedidoValidadoEvento.de(dados)));
+
+		return paraResponse(salvo, itens);
+	}
+
+	/**
+	 * A loja recusa um pedido pendente, cancelando-o. Nenhum estoque é alterado, já que ele só é
+	 * baixado na aceitação.
+	 *
+	 * @param lojaId   ID da loja que está recusando o pedido.
+	 * @param pedidoId ID do pedido a ser recusado.
+	 * @return Pedido atualizado.
+	 * @throws ResponseStatusException Se a loja ou o pedido não forem encontrados, se o pedido não
+	 *                                  pertencer à loja ou se ele não estiver aguardando validação.
+	 */
+	public PedidoResponse recusar(Long lojaId, Long pedidoId) {
+		lojaService.buscarPorId(lojaId);
+		Pedido pedido = buscarEntidadeDaLoja(lojaId, pedidoId);
+		try {
+			pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.CANCELADO);
+		} catch (IllegalStateException e) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+		}
+		Pedido salvo = pedidoRepository.save(pedido);
+		log.info("Pedido {} recusado pela loja {} e transicionou para CANCELADO", salvo.getId(), lojaId);
+		return paraResponse(salvo, itemPedidoRepository.findByPedidoId(salvo.getId()));
+	}
+
+	private Pedido buscarEntidadeDaLoja(Long lojaId, Long pedidoId) {
+		Pedido pedido = buscarEntidade(pedidoId);
+		if (!pedido.getLojaId().equals(lojaId)) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido não encontrado para esta loja");
+		}
+		return pedido;
+	}
+
 	private Pedido buscarEntidade(Long id) {
 		return pedidoRepository.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido não encontrado"));
@@ -234,6 +323,6 @@ public class PedidoService {
 		EnderecoEntregaResponse enderecoEntrega = new EnderecoEntregaResponse(pedido.getEnderecoRua(),
 				pedido.getEnderecoLat(), pedido.getEnderecoLng());
 		return new PedidoResponse(pedido.getId(), pedido.getClienteId(), pedido.getLojaId(), itensResponse,
-				pedido.getTotal(), enderecoEntrega, pedido.getStatus(), pedido.getDataCriacao());
+				pedido.getTotal(), enderecoEntrega, pedido.getStatus(), pedido.getDataCriacao(), pedido.getPin());
 	}
 }

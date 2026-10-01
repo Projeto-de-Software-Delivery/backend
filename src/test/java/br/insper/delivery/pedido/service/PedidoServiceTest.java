@@ -2,6 +2,8 @@ package br.insper.delivery.pedido.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,13 +23,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import br.insper.delivery.cliente.domain.Cliente;
 import br.insper.delivery.cliente.service.ClienteService;
-import br.insper.delivery.loja.domain.EstoqueLoja;
 import br.insper.delivery.loja.domain.Loja;
-import br.insper.delivery.loja.service.EstoqueLojaService;
 import br.insper.delivery.loja.service.LojaService;
 import br.insper.delivery.pedido.domain.ItemPedido;
 import br.insper.delivery.pedido.domain.Pedido;
 import br.insper.delivery.pedido.domain.PedidoStatus;
+import br.insper.delivery.pedido.dto.AceitarPedidoRequest;
 import br.insper.delivery.pedido.dto.CriarPedidoRequest;
 import br.insper.delivery.pedido.dto.EnderecoDados;
 import br.insper.delivery.pedido.dto.EnderecoEntregaRequest;
@@ -38,6 +39,7 @@ import br.insper.delivery.pedido.dto.PedidoResponse;
 import br.insper.delivery.pedido.dto.PedidoRetiradoDados;
 import br.insper.delivery.pedido.dto.PedidoValidadoDados;
 import br.insper.delivery.pedido.event.PedidoCriadoEvent;
+import br.insper.delivery.pedido.event.PedidoValidadoEvent;
 import br.insper.delivery.pedido.repository.ItemPedidoRepository;
 import br.insper.delivery.pedido.repository.PedidoRepository;
 import br.insper.delivery.produto.domain.Produto;
@@ -62,9 +64,6 @@ class PedidoServiceTest {
 	private ProdutoService produtoService;
 
 	@Mock
-	private EstoqueLojaService estoqueLojaService;
-
-	@Mock
 	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
@@ -82,10 +81,8 @@ class PedidoServiceTest {
 	void criarDevePersistirComStatusAguardandoValidacaoEPublicarEvento() {
 		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
 		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
-		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("15.90"), "foto.png");
+		Produto produto = new Produto(2L, "Bolo", "Sobremesas", new BigDecimal("15.90"), 10, "foto.png");
 		when(produtoService.buscarPorId(9L)).thenReturn(produto);
-		EstoqueLoja estoque = new EstoqueLoja(2L, 9L, 10);
-		when(estoqueLojaService.buscarPorLojaEProduto(2L, 9L)).thenReturn(estoque);
 		Pedido salvo = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
 		when(pedidoRepository.save(any(Pedido.class))).thenReturn(salvo);
 		ItemPedido itemSalvo = new ItemPedido(salvo.getId(), 9L, 2, new BigDecimal("15.90"));
@@ -97,7 +94,27 @@ class PedidoServiceTest {
 		assertThat(response.total()).isEqualByComparingTo("31.80");
 		assertThat(response.itens()).hasSize(1);
 		assertThat(response.enderecoEntrega().rua()).isEqualTo("Rua B, 2");
+		assertThat(response.pin()).matches("\\d{4}");
 		verify(eventPublisher).publishEvent(any(PedidoCriadoEvent.class));
+	}
+
+	@Test
+	void criarDeveGerarPinDiferenteACadaPedido() {
+		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Produto produto = new Produto(2L, "Bolo", "Sobremesas", new BigDecimal("15.90"), 10, "foto.png");
+		when(produtoService.buscarPorId(9L)).thenReturn(produto);
+		when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(itemPedidoRepository.save(any(ItemPedido.class)))
+				.thenReturn(new ItemPedido(null, 9L, 2, new BigDecimal("15.90")));
+
+		List<String> pins = java.util.stream.IntStream.range(0, 20)
+				.mapToObj(i -> pedidoService.criar(1L, requestPadrao()).pin())
+				.toList();
+
+		assertThat(pins).allMatch(pin -> pin.matches("\\d{4}"));
+		assertThat(pins.stream().distinct().count()).as("pelo menos algum pin diferente em 20 geracoes")
+				.isGreaterThan(1);
 	}
 
 	@Test
@@ -131,30 +148,25 @@ class PedidoServiceTest {
 	}
 
 	@Test
-	void criarDeveLancarQuandoProdutoNaoDisponivelNaLoja() {
+	void criarDeveLancarBadRequestQuandoProdutoNaoPertenceALoja() {
 		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
 		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
-		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("15.90"), "foto.png");
-		when(produtoService.buscarPorId(9L)).thenReturn(produto);
-		when(estoqueLojaService.buscarPorLojaEProduto(2L, 9L))
-				.thenThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-						"Produto 9 não disponível na loja 2"));
+		Produto produtoDeOutraLoja = new Produto(99L, "Bolo", "Sobremesas", new BigDecimal("15.90"), 10, "foto.png");
+		when(produtoService.buscarPorId(9L)).thenReturn(produtoDeOutraLoja);
 
 		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
 				ResponseStatusException.class, () -> pedidoService.criar(1L, requestPadrao()));
 
-		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 	}
 
 	@Test
 	void criarDeveLancarUnprocessableEntityQuandoEstoqueInsuficiente() {
 		when(clienteService.buscarPorId(1L)).thenReturn(CLIENTE);
 		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
-		Produto produto = new Produto("Bolo", "Sobremesas", new BigDecimal("15.90"), "foto.png");
-		when(produtoService.buscarPorId(9L)).thenReturn(produto);
 		// requestPadrao pede quantidade 2, mas estoque só tem 1
-		EstoqueLoja estoque = new EstoqueLoja(2L, 9L, 1);
-		when(estoqueLojaService.buscarPorLojaEProduto(2L, 9L)).thenReturn(estoque);
+		Produto produto = new Produto(2L, "Bolo", "Sobremesas", new BigDecimal("15.90"), 1, "foto.png");
+		when(produtoService.buscarPorId(9L)).thenReturn(produto);
 
 		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
 				ResponseStatusException.class, () -> pedidoService.criar(1L, requestPadrao()));
@@ -212,6 +224,27 @@ class PedidoServiceTest {
 
 		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
 				() -> pedidoService.listarPorCliente(1L));
+	}
+
+	@Test
+	void listarPendentesPorLojaDeveRetornarApenasAguardandoValidacao() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findByLojaIdAndStatus(2L, PedidoStatus.AGUARDANDO_VALIDACAO)).thenReturn(List.of(pedido));
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+
+		List<PedidoResponse> resultado = pedidoService.listarPendentesPorLoja(2L);
+
+		assertThat(resultado).hasSize(1);
+	}
+
+	@Test
+	void listarPendentesPorLojaDeveLancarQuandoLojaNaoEncontrada() {
+		when(lojaService.buscarPorId(2L))
+				.thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Loja não encontrada"));
+
+		org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
+				() -> pedidoService.listarPendentesPorLoja(2L));
 	}
 
 	@Test
@@ -342,5 +375,105 @@ class PedidoServiceTest {
 				ResponseStatusException.class, () -> pedidoService.aplicarPedidoValidado(dados));
 
 		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+	}
+
+	private AceitarPedidoRequest aceitarPedidoRequestPadrao() {
+		return new AceitarPedidoRequest(new EnderecoDados("Rua A, 1", -23.56, -46.65), new BigDecimal("8.00"), 20);
+	}
+
+	@Test
+	void aceitarDeveBaixarEstoqueTransicionarEPublicarPedidoValidado() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		ItemPedido item = new ItemPedido(1L, 9L, 2, new BigDecimal("15.90"));
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of(item));
+
+		PedidoResponse response = pedidoService.aceitar(2L, 1L, aceitarPedidoRequestPadrao());
+
+		assertThat(response.status()).isEqualTo(PedidoStatus.VALIDADO);
+		verify(produtoService).baixarEstoque(anyMap());
+		verify(eventPublisher).publishEvent(any(PedidoValidadoEvent.class));
+	}
+
+	@Test
+	void aceitarDeveLancarConflitoQuandoProdutoServiceAcusaEstoqueInsuficiente() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		ItemPedido item = new ItemPedido(1L, 9L, 2, new BigDecimal("15.90"));
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of(item));
+		doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Estoque insuficiente para o produto Bolo"))
+				.when(produtoService).baixarEstoque(anyMap());
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aceitar(2L, 1L, aceitarPedidoRequestPadrao()));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(pedido.getStatus()).isEqualTo(PedidoStatus.AGUARDANDO_VALIDACAO);
+	}
+
+	@Test
+	void aceitarDeveLancarNotFoundQuandoPedidoNaoPertenceALoja() {
+		when(lojaService.buscarPorId(3L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aceitar(3L, 1L, aceitarPedidoRequestPadrao()));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void aceitarDeveLancarConflitoQuandoPedidoNaoEstaAguardandoValidacao() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.aceitar(2L, 1L, aceitarPedidoRequestPadrao()));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void recusarDeveCancelarPedidoAguardandoValidacao() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+		when(pedidoRepository.save(pedido)).thenReturn(pedido);
+		when(itemPedidoRepository.findByPedidoId(pedido.getId())).thenReturn(List.of());
+
+		PedidoResponse response = pedidoService.recusar(2L, 1L);
+
+		assertThat(response.status()).isEqualTo(PedidoStatus.CANCELADO);
+	}
+
+	@Test
+	void recusarDeveLancarNotFoundQuandoPedidoNaoPertenceALoja() {
+		when(lojaService.buscarPorId(3L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.recusar(3L, 1L));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void recusarDeveLancarConflitoQuandoPedidoNaoEstaAguardandoValidacao() {
+		when(lojaService.buscarPorId(2L)).thenReturn(LOJA);
+		Pedido pedido = new Pedido(1L, 2L, new BigDecimal("31.80"), "Rua B, 2", -23.5, -46.6);
+		pedido.transicionar(PedidoStatus.AGUARDANDO_VALIDACAO, PedidoStatus.VALIDADO);
+		when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+
+		ResponseStatusException exception = org.junit.jupiter.api.Assertions.assertThrows(
+				ResponseStatusException.class, () -> pedidoService.recusar(2L, 1L));
+
+		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
 	}
 }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.insper.delivery.produto.dto.ProdutoRequest;
@@ -43,14 +44,18 @@ public class ProdutoController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 
-	/**+
-	 * Lista todos os produtos do catálogo.
+	/**
+	 * Lista os produtos do catálogo. Se {@code lojaId} for informado, lista apenas os produtos
+	 * dessa loja.
 	 *
+	 * @param lojaId ID da loja para filtrar, opcional.
 	 * @return ResponseEntity com a lista de produtos.
 	 */
 	@GetMapping
-	public ResponseEntity<List<ProdutoResponse>> listarTodos() {
-		List<ProdutoResponse> response = produtoService.listarTodos().stream().map(ProdutoResponse::from).toList();
+	public ResponseEntity<List<ProdutoResponse>> listarTodos(
+			@RequestParam(required = false) Long lojaId) {
+		List<ProdutoResponse> response = (lojaId != null ? produtoService.listarPorLoja(lojaId)
+				: produtoService.listarTodos()).stream().map(ProdutoResponse::from).toList();
 		return ResponseEntity.ok(response);
 	}
 
